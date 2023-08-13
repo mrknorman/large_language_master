@@ -1,4 +1,7 @@
 import sys
+import openai
+import time
+from pathlib import Path 
 
 # Remember traps and secret levers
 
@@ -48,6 +51,35 @@ class room():
     def create_new_encounter():
         print("NEW")
 
-
 if __name__ == "__main__":
-    print("Heelo")
+    # Example of an OpenAI ChatCompletion request
+    # https://platform.openai.com/docs/guides/chat
+
+    # record the time before the request is sent
+    start_time = time.time()
+    
+    message_assembly = []
+    
+    system_prompt = []
+
+
+
+    openai.api_key_path = Path("./api_key")
+
+    # send a ChatCompletion request to count to 100
+    response = openai.ChatCompletion.create(
+                model='gpt-3.5-turbo',
+                    messages=[
+                                {'role': 'system', 
+                                 'content': 'You are an expert dungeon master with many years of experience and a creative story-driven aproach to construting adventures. Your primary goal is to create a fun and engaging experience for all your players. Your responses will be ingested into a framework program so try to generate outputs which are as close to the format described as possible.'},
+                                {'role': 'user', 'content': 'You are designing a new room for your adventuring party to explore. First reply with the name of the room only.'}
+                                    ],
+                        temperature=0,
+                        )
+
+    # calculate the time it took to receive the response
+    response_time = time.time() - start_time
+
+    # print the time delay and text received
+    print(f"Full response received {response_time:.2f} seconds after request")
+    print(f"Full response received:\n{response}")
