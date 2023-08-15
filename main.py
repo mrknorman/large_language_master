@@ -72,9 +72,15 @@ if __name__ == "__main__":
                     messages=[
                                 {'role': 'system', 
                                  'content': 'You are an expert dungeon master with many years of experience and a creative story-driven aproach to construting adventures. Your primary goal is to create a fun and engaging experience for all your players. Your responses will be ingested into a framework program so try to generate outputs which are as close to the format described as possible.'},
-                                {'role': 'user', 'content': 'You are designing a new room for your adventuring party to explore. First reply with the name of the room only.'}
-                                    ],
-                        temperature=0,
+                                {'role': 'user', 'content': 'You are designing a new room for your'\
+                                ' adventuring party to explore. Respond with an outline in the following format:' \
+                                'name: the name of the room. purpose: the in universe purpse of the room. '\
+                                'flavour_text: a decription of the room for the players' \
+                                'secrets: any secrets the room may hold' \
+                                'overall_story: the underlying story you want the room to tell.' \
+                                'purpose: the effect you imagine this room will have on the players stories' }
+                            ],
+                        temperature=0.7
                         )
 
     # calculate the time it took to receive the response
