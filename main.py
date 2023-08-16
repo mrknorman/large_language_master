@@ -40,10 +40,11 @@ class Room:
     characters = []
     items = []
 
-    def __init__(self, name, connected_to, dungeon):
+    def __init__(self, room_dict, dungeon):
 
-        self.name = name
-        self.connected_to = connected_to
+        self.name         = room_dict["name"]
+        self.connected_to = room_dict["connected_to"]
+        self.has_entrance = room_dict["has_entrance"]
 
         plan = self.create_plan(dungeon)
         self.ingest(plan)
@@ -85,9 +86,9 @@ class Room:
                 The player will only see the name and the flavour text. The others are notes for the dungeon ai 
                 to use when generating the room\'s details, to ensure consistency.
 
-                The rooms is called {self.name} and is connected to {self.connected_to}
+                The rooms is called {self.name} and is connected to {self.connected_to}.
                 
-                Respond with an brief outline in the following format imitating a python dictionary:
+                Respond with a brief outline in the following format imitating a python dictionary:
                 {{
                 \"purpose\": \"the in universe purpose of the room\",
                 \"flavour\": \"an emotive decription of the room for the players\",
@@ -102,25 +103,21 @@ class Room:
                         messages=[
                                     {
                                         'role':'system', 
-                                        'content': 
-                                        'You are an expert dungeon master with many years of experience and a'
-                                        'creative story-driven approach to constructing adventures. Your primary goal is to '
-                                        'create a fun and engaging experience for all your players. Your responses will be '
-                                        'placed into a framework so try to generate outputs which are as close to the format '
-                                        'described as possible.'
+                                        'content': system_prompt
+                                        
                                     },
                                     {
                                         'role':'user', 
                                         'content': room_string 
                                     }
                                 ],
-                            temperature=0
+                            temperature=0.5
                             )
 
         return json.loads(response["choices"][0]["message"]["content"])
 
-        def create_new_encounter():
-            print("NEW")
+    def enter(self):
+        print(self.flavour)
 
 class Dungeon:
 
@@ -128,15 +125,17 @@ class Dungeon:
         self.name = name
         plan = self.create_dungeon_plan(name)
         self.ingest(plan)
+        self.create_rooms()
+        self.find_entrances()
 
     def ingest(self, data):
         """Ingest room data from dictionary format."""
-        self.purpose  = data.get('purpose', "")
-        self.flavour  = data.get('flavour', "")
-        self.secrets  = data.get('secrets', "")
-        self.story    = data.get('story', "")
-        self.effect   = data.get('effect', "")
-        self.rooms    = data.get('rooms', "")
+        self.purpose    = data.get('purpose', "")
+        self.flavour    = data.get('flavour', "")
+        self.secrets    = data.get('secrets', "")
+        self.story      = data.get('story', "")
+        self.effect     = data.get('effect', "")
+        self.room_dicts = data.get('rooms', "")
 
     def display(self):
         """Display the details of the room."""
@@ -150,63 +149,106 @@ class Dungeon:
         """)
 
     def create_dungeon_plan(self, name):
+
+        dungeon_string = \
+            f"""
+                You are designing a dungeon called {name} for your adventuring party to explore.
+
+                The details of the rooms will be filled out by you later on, for now focus on the overall plan of 
+                the dungeon, the story you\'d like it to tell, and how it will affect the player\'s journey.'
+                Respond with a brief outline in the following format imitating a python dictionary:
+                {{
+                \"purpose\": \"the in universe purpose of the dungeon\", \n
+                \"flavour\": \"a description of the dungeon that players might know before entering\"
+                \"secrets\": \"any secrets the dungeon may hold\"
+                \"story\": \"the underlying story you want the dungeon to tell.\"
+                \"effect\": \"the effect you imagine this room will have on the players stories\"
+                \"rooms\": [
+                    {{\"name\": room_name, \"connected_to\": [ list_of_connecting_rooms ], 
+                        \"has_entrance\": bool, true if room has dungon entrance/exit}}
+                    ...
+                    ]
+                }}
+            """
+
         response = openai.ChatCompletion.create(
             model='gpt-3.5-turbo',
                 messages=[
                             {
                                 'role':'system', 
-                                'content': 
-                                'You are an expert dungeon master with many years of experience and a'
-                                'creative story-driven approach to constructing adventures. Your primary goal is to '
-                                'create a fun and engaging experience for all your players. Your responses will be '
-                                'placed into a framework so try to generate outputs which are as close to the format '
-                                'described as possible.'
+                                'content': system_prompt
                             },
                             {
                                 'role':'user', 
-                                'content': 
-                                f'You are designing a dungeon called {name} for your adventuring party to explore.'
-                                'The details of the rooms will be filled out by you later on, for now focus on the overall plan of '
-                                'the dungeon as well, the story you\'d like it to tell, and how it will effect the player\'s journey.'
-                                'Respond with an brief outline in the following format imitating a python dictionary:' \
-                                '\"purpose\": \"the in universe purpose of the dungeon\", \n'\
-                                '\"flavour\": \"an emotive decription of the dungeon for the players\"' \
-                                '\"secrets\": \"any secrets the dungeon may hold\"' \
-                                '\"story\": \"the underlying story you want the dungeon to tell.\"' \
-                                '\"effect\": \"the effect you imagine this room will have on the players stories\"'
-                                '\"rooms\": ['
-                                    '{\"name\": room_name, \"connected_to\": [ list_of_connecting_rooms ] }'
-                                    '...'
-                                ']}' 
+                                'content': dungeon_string
                             }
                         ],
-                    temperature=0
+                    temperature=0.5
                     )
 
         return json.loads(response["choices"][0]["message"]["content"])
 
+    def check_connections(self, name):  
+        for room_dict in self.room_dicts:
+            for connected_dict in self.room_dicts.connected_to:
+                pass # work on this at some point
+
+    def create_rooms(self):
+        self.rooms = {}
+        for room_dict in self.room_dicts:
+            self.rooms[room_dict["name"]] = Room(room_dict, self)
+
+    def find_entrances(self):
+        self.entrances = []
+        for room in self.rooms.values():
+            if room.has_entrance == True:
+                self.entrances.append(room.name)
 
 if __name__ == "__main__":
     # Example of an OpenAI ChatCompletion request
     # https://platform.openai.com/docs/guides/chat
 
-    # record the time before the request is sent
-    start_time = time.time()
-    
+    system_prompt = \
+    f"""
+        You are an expert dungeon master with many years of experience and a
+        creative story-driven approach to constructing adventures. Your primary goal is to
+        create a fun and engaging experience for all your players. Your responses will be 
+        placed into a framework so try to generate outputs which are as close to the format 
+        described as possible.
+    """
+
     message_assembly = []
     
-    system_prompt = []
-
     openai.api_key_path = Path("./api_key")
 
-    dungeon = Dungeon("The Grand Palandatair of Old Sinhai")
-    dungeon.display()
+    dungeon = Dungeon("The Tomb Urmouth Stormfather")
 
-    rooms = []
-    for r in dungeon.rooms:
+    print(f"{dungeon.name}\n {dungeon.flavour}")
 
-        print("\n")
-        new_room = Room(r['name'], r['connected_to'], dungeon)
-        new_room.display()
+    print(f"There are {len(dungeon.entrances)} entrances to the dungeon:\n")
+        
+    for index, entrance in enumerate(dungeon.entrances):
+        print(f"{index}. {entrance}")
 
-        rooms.append(rooms)
+    choice = int(input("Which entrance do you want to use? Enter the number:"))
+
+    current_room = dungeon.rooms[dungeon.entrances[choice]]
+
+    while True:
+        current_room.enter()
+
+        print(f"There are {len(current_room.connected_to)} exits to this room:\n")
+        
+        for index, exit in enumerate(current_room.connected_to):
+            print(f"{index}. {exit}")
+
+        choice = int(input("Which room do you want to enter? Enter the number:"))
+
+        current_room = dungeon.rooms[current_room.connected_to[choice]]
+
+
+
+
+
+
+
