@@ -74,7 +74,7 @@ if __name__ == "__main__":
                                  'content': 'You are an expert dungeon master with many years of experience and a creative story-driven aproach to construting adventures. Your primary goal is to create a fun and engaging experience for all your players. Your responses will be ingested into a framework program so try to generate outputs which are as close to the format described as possible.'},
                                 {'role': 'user', 'content': 'You are designing a new room for your'\
                                 ' adventuring party to explore. Respond with an outline in the following format:' \
-                                'name: the name of the room. purpose: the in universe purpse of the room. '\
+                                'name: the name of the room. purpose: the in universe purpose of the room. '\
                                 'flavour_text: a decription of the room for the players' \
                                 'secrets: any secrets the room may hold' \
                                 'overall_story: the underlying story you want the room to tell.' \
