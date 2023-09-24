@@ -1,15 +1,22 @@
+# Built-In Libraries:
 import sys
-import openai
 import time
-from pathlib import Path 
-import numpy as np
+import argparse
 import json
 import ast
-
 import pickle
-
 from dataclasses import dataclass
+from pathlib import Path 
+
+# External libraries:
+import numpy as np
+import openai
 from tqdm import tqdm
+
+# Internal Libraries:
+import prompts
+import commands
+
 # Remember traps and secret levers
 
 # Trapped       = will activate on interaction
@@ -48,24 +55,27 @@ class Player():
 
     passive_perception : int = perception
 
-def check_response(response, system_prompt, prompt):
+def check_response(response, prompt):
     try:
         response = json.loads(response["choices"][0]["message"]["content"])
-    except exception as e:
+    except Exception as e:
         error_prompt = \
-            item_string + f"Your previous response had this error: {e}, please try again."
+            f"Your previous response: [{response}] to this prompt: [{prompt}], had this error: [{e}], please try again." \
+            "Respond only in a format that can be read as a JSON, anything else will result in an error."
+
+        print(f"Error, trying again: {e}")
 
         response = openai.ChatCompletion.create(
-            model='gpt-3.5-turbo',
+            model='gpt-4-0613',
                 messages=[
                             {
                                 'role':'system', 
-                                'content': system_prompt
+                                'content': prompts.system()
                                 
                             },
                             {
                                 'role':'user', 
-                                'content': prompt 
+                                'content': error_prompt
                             }
                         ],
                     temperature=0.5
@@ -119,7 +129,7 @@ class Room:
         self.discovered_items = {}
         self.discovered_egress = {}
 
-        plan = self.create_plan(dungeon)
+        plan = self.plan()
         self.ingest(plan)
 
     def ingest(self, room_data):
@@ -141,42 +151,15 @@ class Room:
             Effect: {self.effect}
         """)
 
-    def create_plan(self, dungeon):
-        # send a ChatCompletion request to count to 100
-
-        room_prompt = \
-            f"""
-                You are designing a new room for your adventuring party to explore.
-                Here is a description of the dungeon that contains the room:
-                
-                Name: {dungeon.name}
-                Purpose: {dungeon.purpose}
-                Flavour: {dungeon.flavour}
-                Secrets: {dungeon.secrets}
-                Story: {dungeon.story}
-                Effect: {dungeon.effect}
-
-                The player will only see the name and the flavour text. The others are notes for the dungeon ai 
-                to use when generating the room\'s details, to ensure consistency.
-
-                This room is called {self.name} and is connected to: {self.connected_to}.
-                
-                Respond with a brief outline in the following format imitating a python dictionary:
-                {{
-                "purpose": "the in universe purpose of the room",
-                "flavour": "a rich decription of the room for the players",
-                "secrets": "any secrets the room may hold",
-                "story": "the underlying story you want the room to tell",
-                "effect": "the effect you imagine this room will have on the players stories"
-                }}
-            """
+    def plan(self):
+        room_prompt = prompts.room(self)
 
         response = openai.ChatCompletion.create(
-                    model='gpt-3.5-turbo',
+                    model='gpt-4-0613',
                         messages=[
                                     {
                                         'role':'system', 
-                                        'content': system_prompt
+                                        'content': prompts.system()
                                         
                                     },
                                     {
@@ -187,123 +170,45 @@ class Room:
                             temperature=0.5
                             )
 
+        return check_response(response, room_prompt)
 
+    def plan_items(self):
 
-        return check_response(response, system_prompt, room_prompt)
-
-    def create_items(self):
-
-        dungeon = self.containing_dungeon
-
-        item_prompt = \
-            f"""
-                You are designing a new room for your adventuring party to explore.
-                Here is a description of the dungeon that contains the room:
-                
-                Name:{dungeon.name}
-                Purpose:{dungeon.purpose}
-                Flavour:{dungeon.flavour}
-                Secrets:{dungeon.secrets}
-                Story:{dungeon.story}
-                Effect:{dungeon.effect}
-
-                This room is called {self.name} and is connected to: {self.connected_to}.
-                Here is a description of the room:
-
-                Purpose:{self.purpose}
-                Flavour:{self.flavour}
-                Secrets:{self.secrets}
-                Story:{self.story}
-                Effect:{self.effect}
-
-                I would like you to respond with a list of items in the room. Do not include doors
-                or other entranceways, or flooring or wall materials. Give your response in the following 
-                json format:
-                {{
-                    "Item Name":{{
-                        "purpose": str #in universe purpose of the item,
-                        "story": str #how the object adds to the room's story,
-                        "visibility:" int #see below
-                    }}
-                }}
-
-                Given that visibility is mesured out of 30 where:
-                1: Impossible to miss, 5: Very easy to see, 10: Easy to see, 15: Could easily be overlooked,
-                20: Hard to see, 25: Very hard to see, 30: Almost impossible to see.
-                Note: visibility can take any value between 1 and 30, not just these examples.
-                }}
-            """            
-
+        room_items_prompt = prompts.room_items(self)
         response = openai.ChatCompletion.create(
-            model='gpt-3.5-turbo',
+            model='gpt-4-0613',
                 messages=[
                             {
                                 'role':'system', 
-                                'content': system_prompt
+                                'content': prompts.system()
                                 
                             },
                             {
                                 'role':'user', 
-                                'content': item_prompt
+                                'content': room_items_prompt
                             }
                         ],
                     temperature=0.5
                     )
 
-        self.item_dict = check_response(response, system_prompt, item_prompt)
+        self.item_dict = check_response(response, room_items_prompt)
 
-    def create_egress(self):
 
-        dungeon = self.containing_dungeon
+    def generate_item(self):
+        pass
 
-        egress_prompt = \
-            f"""
-                You are designing a new room for your adventuring party to explore.
-                Here is a description of the dungeon that contains the room:
-                
-                Name:{dungeon.name}
-                Purpose:{dungeon.purpose}
-                Flavour:{dungeon.flavour}
-                Secrets:{dungeon.secrets}
-                Story:{dungeon.story}
-                Effect:{dungeon.effect}
+    def plan_egress(self):
 
-                This room is called {self.name}.
-                Here is a description of the room:
+        egress_prompt = prompts.egress(self)
 
-                Purpose:{self.purpose}
-                Flavour:{self.flavour}
-                Secrets:{self.secrets}
-                Story:{self.story}
-                Effect:{self.effect}
-
-                I would like you to decide on the visibility of the room's egress points.
-                This room connects to these rooms: {self.connected_to} each will require an egress entry.
-                Come up with a desciptive name for each entrance point that will inform the player of its
-                appearence.
-
-                Respond in the following json ready format:
-                {{
-                    "Descriptive Egress Name":{{
-                        "leads_to": str #room this point leads to, use exact name as listed above,
-                        "purpose": str #in universe purpose of the entryway,
-                        "visibility:" int #see below
-                    }}
-                }}
-
-                Given that visibility is measured out of 30 where:
-                1: Impossible to miss, 5: Very easy to see, 10: Easy to see, 15: Could easily be overlooked,
-                20: Hard to see, 25: Very hard to see, 30: Almost impossible to see.
-                Note: visibility can take any value between 1 and 30, not just these examples.
-                }}
-            """            
+        print(egress_prompt)
 
         response = openai.ChatCompletion.create(
-            model='gpt-3.5-turbo',
+            model='gpt-4-0613',
                 messages=[
                             {
                                 'role':'system', 
-                                'content': system_prompt
+                                'content': prompts.system()
                                 
                             },
                             {
@@ -314,17 +219,20 @@ class Room:
                     temperature=0.5
                     )
 
-        self.egress_dict = check_response(response, system_prompt, egress_prompt)
-
+        self.egress_dict = check_response(response, egress_prompt)
 
     def enter(self, player):
-        print(current_room.flavour)
+        print(self.flavour)
 
         if (self.item_dict == {}):
-            self.create_items()
+            print("Generating item plan...")
+            self.plan_items()
+            print("Complete.")
 
         if (self.egress_dict == {}):
-            self.create_egress()
+            print("Generating egress plan...")
+            self.plan_egress()
+            print("Complete.")
 
         for name, value in self.item_dict.items():
             if (value["visibility"] <= player.passive_perception):
@@ -375,7 +283,7 @@ class Dungeon:
 
     def __init__(self, name=None):
         self.name = name
-        plan = self.create_dungeon_plan(name)
+        plan = self.plan(name)
         self.ingest(plan)
         self.create_rooms()
         self.find_entrances()
@@ -400,37 +308,15 @@ class Dungeon:
             Effect: {self.effect}
         """)
 
-    def create_dungeon_plan(self, name):
-        dungeon_prompt = \
-            f"""
-                You are designing a dungeon called {name} for your adventuring party to explore.
+    def plan(self, name):
 
-                The details of the rooms will be filled out by you later on, for now focus on the overall plan of 
-                the dungeon, the story you'd like it to tell, and how it will affect the player's journey.
-                Respond with a brief outline in the following format imitating a python dictionary:
-                {{
-                    "purpose": "the in universe purpose of the dungeon",
-                    "flavour": "a description of the dungeon that players might know before entering",
-                    "secrets": "any secrets the dungeon may hold",
-                    "story": "the underlying story you want the dungeon to tell",
-                    "effect": "the effect you imagine this room will have on the players stories"
-                    "rooms": {{
-                        "Room 1 Name":
-                        {{
-                            "connected_to": [ list_of_connecting_rooms ], 
-                            "has_entrance": bool, true if room has dungon entrance/exit
-                        }},
-                    ...
-                    }}
-                }}
-            """
-
+        dungeon_prompt = prompts.dungeon(name)
         response = openai.ChatCompletion.create(
-            model='gpt-3.5-turbo',
+            model='gpt-4-0613',
                 messages=[
                             {
                                 'role':'system', 
-                                'content': system_prompt
+                                'content': prompts.system()
                             },
                             {
                                 'role':'user', 
@@ -440,13 +326,26 @@ class Dungeon:
                     temperature=0.5
                     )
 
-        return check_response(response, system_prompt, dungeon_prompt)
+        return check_response(response, dungeon_prompt)
 
     def check_connections(self):  
+
         for name, value in self.room_dicts.items():
             for connected_name in value["connected_to"]:
                 if name not in self.room_dicts[connected_name]["connected_to"]:
                     self.room_dicts[connected_name]["connected_to"].append(name)
+
+    def get_connected_pairs(self):
+        """Returns a set containing all pairs of connected rooms."""
+        connected_pairs = set()
+
+        for room_name, room_data in self.room_dicts.items():
+            for connected_room in room_data["connected_to"]:
+                # Creating a sorted tuple to ensure uniqueness (e.g., (A, B) == (B, A))
+                pair = tuple(sorted([room_name, connected_room]))
+                connected_pairs.add(pair)
+
+        return connected_pairs
 
     def create_rooms(self):
         self.rooms = {}
@@ -465,73 +364,84 @@ class Dungeon:
         with open('dungeon.pickle', 'wb') as handle:
           pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+def load_or_generate_dungeon(
+    regenerate: bool, 
+    filename: Path
+    ) -> Dungeon:
 
-if __name__ == "__main__":
-    # Example of an OpenAI ChatCompletion request
-    # https://platform.openai.com/docs/guides/chat
-
-    system_prompt = \
-    f"""
-        You are an expert dungeon master with many years of experience and a
-        creative story-driven approach to constructing adventures. Your primary goal is to
-        create a fun and engaging experience for all your players. Your responses will be 
-        placed into a framework so try to generate outputs which are as close to the format 
-        described as possible.
     """
+    Load or regenerate the dungeon based on the flag provided.
 
-    message_assembly = []
-    
+    Parameters
+    ----------
+    regenerate : bool
+        Flag to regenerate the dungeon.
+    filename : Path
+        Path to the file where the dungeon is stored.
+
+    Returns
+    -------
+    Dungeon
+        The loaded or regenerated dungeon.
+    """
+    if not regenerate and filename.exists():
+        with filename.open('rb') as handle:
+            dungeon = pickle.load(handle)
+    else:
+        dungeon = Dungeon("The Temple of Old Ricky Bones")
+        with filename.open('wb') as handle:
+            pickle.dump(dungeon, handle)
+    return dungeon
+
+def cli_loop(dungeon, current_room, player):
+    """Encapsulated command-line interaction loop."""
+
+    commands_ = commands.initialize()
+    while True:
+        command_input = input("What would you like to do?")
+        command_parts = command_input.split()
+        command_name = command_parts[0]
+
+        if command_name in commands_:
+            command = commands_[command_name]
+            current_room = command.execute(command_parts[1:], dungeon, current_room, player) or current_room
+        elif command_name == "help":
+            for cmd in commands_.values():
+                print(f"{cmd.name}: {cmd.description}")
+        elif command_name == "quit":
+            break
+        else:
+            print("Invalid command. Type 'help' for a list of available commands.")
+
+def main():
+
+    parser = argparse.ArgumentParser(description="Dungeon master's main game loop.")
+    parser.add_argument('--regenerate', action='store_true', help='Force regeneration of the dungeon.')
+    args = parser.parse_args()
+
     openai.api_key_path = Path("./api_key")
+    dungeon_filename = Path("dungeon.pickle")
+    dungeon = load_or_generate_dungeon(args.regenerate, dungeon_filename)
 
-    #dungeon = Dungeon("The Temple of Glob Blobulon")
-    #dungeon.save()
-
-    with open('filename.pickle', 'rb') as handle:
-        dungeon = pickle.load(handle)
+    print(dungeon.get_connected_pairs())
+    quit()
 
     player = Player()
-
-    print(f"{dungeon.name}\n {dungeon.flavour}")
+    print(f"{dungeon.name}\n{dungeon.flavour}")
     print(f"There are {len(dungeon.entrances)} entrances to the dungeon:\n")
-        
+
     for index, entrance in enumerate(dungeon.entrances):
         print(f"{index}. {entrance}")
 
     choice = int(input("Which entrance do you want to use? Enter the number:"))
-
     current_room = dungeon.rooms[dungeon.entrances[choice]]
     current_room.enter(player)
 
-    while True:      
-        commands = {
-            "list" : {
-                "all": current_room.listAll, 
-                "items": current_room.listItems, 
-                "egress": current_room.listEgress
-            }
-        }
+    commands.initialize()
+    cli_loop(dungeon, current_room, player)
 
-        command = input("What would you like to do?").split()
-
-        if (command[0] == "list"):
-            commands["list"][command[1]]()
-        elif (command[0] == "observe"):
-            current_room.observe(player)
-        elif (command[0] == "enter"):
-            current_room = \
-                dungeon.rooms[
-                    current_room.discovered_egress[" ".join(command[1:])]["leads_to"]
-                ]
-            current_room.enter(player)
-        elif (command[0] == "quit"):
-            quit()
-
-        #print(f"There are {len(current_room.connected_to)} exits to this room:\n")
-        
-        #for index, exit in enumerate(current_room.connected_to):
-         #   print(f"{index}. {exit}")
-
-        #current_room = dungeon.rooms[current_room.connected_to[choice]]
+if __name__ == "__main__":
+    main()
 
 
 
