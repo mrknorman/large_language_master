@@ -108,13 +108,14 @@ class Room:
     structure  = []
     characters = []
 
-    egress_dict = {}
+    portal_dict = {}
     item_dict = {}
 
     discovered_items = {}
-    discovered_egress = {}
+    discovered_portals = {}
 
     perception_roll = 0
+    unexplored = True
 
     def __init__(self, name, room_dict, dungeon):
 
@@ -124,10 +125,16 @@ class Room:
 
         self.containing_dungeon = dungeon
         self.item_dict = {}
-        self.egress_dict = {}
+        self.portal_dict = {}
 
         self.discovered_items = {}
-        self.discovered_egress = {}
+        self.discovered_portals = {}
+
+        for key, value in dungeon.portals.items():
+            if (value.connection_a == name):
+                self.portal_dict[key] = value
+            elif (value.connection_b == name):
+                self.portal_dict[key] = value
 
         plan = self.plan()
         self.ingest(plan)
@@ -193,54 +200,38 @@ class Room:
 
         self.item_dict = check_response(response, room_items_prompt)
 
-
     def generate_item(self):
         pass
 
-    def plan_egress(self):
+    def exapand_portals(self):
 
-        egress_prompt = prompts.egress(self)
+        for value in self.portal_dict.values():
+            value.expand(self)
 
-        print(egress_prompt)
-
-        response = openai.ChatCompletion.create(
-            model='gpt-4-0613',
-                messages=[
-                            {
-                                'role':'system', 
-                                'content': prompts.system()
-                                
-                            },
-                            {
-                                'role':'user', 
-                                'content': egress_prompt
-                            }
-                        ],
-                    temperature=0.5
-                    )
-
-        self.egress_dict = check_response(response, egress_prompt)
-
-    def enter(self, player):
+    def enter(self, player, previous_room = None):
         print(self.flavour)
 
-        if (self.item_dict == {}):
+        if self.unexplored == True:
             print("Generating item plan...")
             self.plan_items()
             print("Complete.")
 
-        if (self.egress_dict == {}):
-            print("Generating egress plan...")
-            self.plan_egress()
+            print("Expanding portals...")
+            self.exapand_portals()
             print("Complete.")
+
+            self.unexplored = False
+
+        if previous_room is not None:
+            self.discovered_items[previous_room.name] = previous_room
 
         for name, value in self.item_dict.items():
             if (value["visibility"] <= player.passive_perception):
                 self.discovered_items[name] = value
 
-        for name, value in self.egress_dict.items():
-            if (value["visibility"] <= player.passive_perception):
-                self.discovered_egress[name] = value
+        for name, value in self.portal_dict.items():
+            if (value.visibility <= player.passive_perception):
+                self.discovered_portals[name] = value
 
     def observe(self, player):
 
@@ -259,10 +250,10 @@ class Room:
                     self.discovered_items[name] = value
                     print(f"You discovered: {name}!")
 
-        for name, value in self.egress_dict.items():
-            if name not in self.discovered_egress.keys():
-                if (value["visibility"] <= self.perception_roll):
-                    self.discovered_egress[name] = value
+        for name, value in self.portal_dict.items():
+            if name not in self.discovered_portals.keys():
+                if (value.visibility <= self.perception_roll):
+                    self.discovered_portals[name] = value
                     print(f"You discovered: {name}!")
 
     def listAll(self):
@@ -276,7 +267,7 @@ class Room:
 
     def listEgress(self):
         print("Discovered Egress Points:")
-        for index, (name, value) in enumerate(self.discovered_egress.items()): 
+        for index, (name, value) in enumerate(self.discovered_portals.items()): 
             print(f"{index}. {name}")
 
 class Dungeon:
@@ -285,6 +276,9 @@ class Dungeon:
         self.name = name
         plan = self.plan(name)
         self.ingest(plan)
+        self.check_connections()
+        self.plan_portals()
+        self.create_portals()
         self.create_rooms()
         self.find_entrances()
 
@@ -328,6 +322,29 @@ class Dungeon:
 
         return check_response(response, dungeon_prompt)
 
+    def plan_portals(self):
+
+        self.portal_pairs = self.get_connected_pairs()
+        portal_prompt = prompts.plan_portal(self)
+
+        response = openai.ChatCompletion.create(
+            model='gpt-4-0613',
+                messages=[
+                            {
+                                'role':'system', 
+                                'content': prompts.system()
+                                
+                            },
+                            {
+                                'role':'user', 
+                                'content': portal_prompt
+                            }
+                        ],
+                    temperature=0.5
+                    )
+
+        self.portal_plan = check_response(response, portal_prompt)
+
     def check_connections(self):  
 
         for name, value in self.room_dicts.items():
@@ -347,12 +364,23 @@ class Dungeon:
 
         return connected_pairs
 
+    def create_portals(self):
+        self.portals = {}
+        for key, value in self.portal_plan.items():
+
+            self.portals[key] = Portal(
+                name=key,
+                description=value["description"],
+                conditions=value["conditions"],
+                connection_a=list(value["asymmetries"].keys())[0],
+                connection_b=list(value["asymmetries"].keys())[1],
+                asymmetries=value["asymmetries"]
+        )
+
     def create_rooms(self):
         self.rooms = {}
         for name, value in tqdm(self.room_dicts.items()):
             self.rooms[name] = Room(name, value, self)
-
-        self.check_connections()
 
     def find_entrances(self):
         self.entrances = []
@@ -363,6 +391,92 @@ class Dungeon:
     def save(self): 
         with open('dungeon.pickle', 'wb') as handle:
           pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+@dataclass
+class Portal():
+
+    name : str
+    description : str
+    conditions : str
+
+    connection_a : str
+    connection_b : str
+
+    asymmetries : dict
+
+    inspected : bool = False
+
+    visibility : int = -1
+    lock_difficulty : int = -1
+
+    room_info = {}
+
+    def expand(self, room):
+
+        portal_prompt = prompts.portal(room, self)
+
+        response = openai.ChatCompletion.create(
+            model='gpt-4-0613',
+                messages=[
+                            {
+                                'role':'system', 
+                                'content': prompts.system()
+                                
+                            },
+                            {
+                                'role':'user', 
+                                'content': portal_prompt
+                            }
+                        ],
+                    temperature=0.5
+                    )
+
+        response_dict = check_response(response, portal_prompt)
+
+        self.visibility = response_dict["visibility"]
+        self.hit_points = response_dict["hit_points"]
+
+        self.is_locked = False
+        self.is_locked = False
+        self.is_barricaded = False
+
+        if self.conditions == "locked":
+            self.is_locked = True
+        elif self.conditions == "blocked":
+            self.is_blocked = True
+        elif self.conditions == "barricaded":
+            self.is_barricaded = True
+
+        self.is_passable = not (self.is_locked or self.is_locked or self.is_barricaded)
+
+    def inspect(self, room, room_b):
+
+        portal_prompt = prompts.portal_inspect(room, room_b, self)
+
+        response = openai.ChatCompletion.create(
+            model='gpt-4-0613',
+                messages=[
+                            {
+                                'role':'system', 
+                                'content': prompts.system()
+                                
+                            },
+                            {
+                                'role':'user', 
+                                'content': portal_prompt
+                            }
+                        ],
+                    temperature=0.5
+                    )
+
+        extra_dict = check_response(response, portal_prompt)
+
+        self.flavour_text = extra_dict["flavour_text"]
+        self.failed_entry_text = extra_dict["failed_entry_text"]
+        self.entry_text = extra_dict["entry_text"]
+        self.lock_difficulty = extra_dict["lock_difficulty"]
+        self.force_difficulty = extra_dict["force_difficulty"] 
+        self.is_trapped = extra_dict["is_trapped"]
 
 def load_or_generate_dungeon(
     regenerate: bool, 
@@ -422,9 +536,6 @@ def main():
     openai.api_key_path = Path("./api_key")
     dungeon_filename = Path("dungeon.pickle")
     dungeon = load_or_generate_dungeon(args.regenerate, dungeon_filename)
-
-    print(dungeon.get_connected_pairs())
-    quit()
 
     player = Player()
     print(f"{dungeon.name}\n{dungeon.flavour}")
