@@ -1,21 +1,25 @@
 # Built-In Libraries:
-import sys
-import time
 import argparse
 import json
-import ast
 import pickle
 from dataclasses import dataclass
 from pathlib import Path 
+import re
 
 # External libraries:
 import numpy as np
-import openai
+from openai import OpenAI
+
+client = OpenAI(api_key=open('./api_key', 'r').read())
+
+MODEL = "gpt-4"
+TEMP = 0.7
 from tqdm import tqdm
 
 # Internal Libraries:
 import prompts
 import commands
+import audio
 
 # Remember traps and secret levers
 
@@ -26,18 +30,6 @@ import commands
 # Traversable   = can use to move around the room, i.e stairs, elevators.
 # Exit          = can be used to leave room
 
-"""
-    {{
-        "item_name":{{
-            "purpose": "in universe purpose of the item",
-            "flavour": "a decription of the item for the players",
-            "secrets": "any secrets the room may hold",
-            "story": "how the object adds to the room's story"
-        }}
-
-    }}
-"""
-
 def roll20():
     return np.random.randint(1, 21)
 
@@ -46,7 +38,7 @@ class Player():
     strength : int = 10
     dexterity : int = 10
     constitution : int = 10
-    inteligence : int = 12
+    inteligence : int = 120
     wisdom : int = 10
     charisma : int = 10
 
@@ -57,29 +49,29 @@ class Player():
 
 def check_response(response, prompt):
     try:
-        response = json.loads(response["choices"][0]["message"]["content"])
+        response = json.loads(response.choices[0].message.content)
     except Exception as e:
         error_prompt = \
             f"Your previous response: [{response}] to this prompt: [{prompt}], had this error: [{e}], please try again." \
-            "Respond only in a format that can be read as a JSON, anything else will result in an error."
+            "Respond only in a format that can be read as a JSON by python's json.loads function, anything else will result in an error."
 
         print(f"Error, trying again: {e}")
 
-        response = openai.ChatCompletion.create(
-            model='gpt-4-0613',
-                messages=[
-                            {
-                                'role':'system', 
-                                'content': prompts.system()
-                                
-                            },
-                            {
-                                'role':'user', 
-                                'content': error_prompt
-                            }
-                        ],
-                    temperature=0.5
-                    )
+        response = client.chat.completions.create(model=MODEL,
+            messages=[
+                        {
+                            'role':'system', 
+                            'content': prompts.system()
+                            
+                        },
+                        {
+                            'role':'user', 
+                            'content': error_prompt
+                        }
+                    ],
+                temperature=TEMP)
+
+        response = check_response(response, prompt)
 
     return response
 
@@ -105,14 +97,17 @@ class structure():
 
 class Room:
 
-    structure  = []
-    characters = []
+    structure  = None
+    characters = None
 
-    portal_dict = {}
-    item_dict = {}
+    portal_dict = None
+    item_dict = None
 
-    discovered_items = {}
-    discovered_portals = {}
+    discovered_items = None
+    discovered_portals = None
+
+    planned = None
+    perceived = None
 
     perception_roll = 0
     unexplored = True
@@ -123,9 +118,12 @@ class Room:
         self.connected_to = room_dict["connected_to"]
         self.has_entrance = room_dict["has_entrance"]
 
+        self.discovered_items = {}
+        self.perception_roll = 0
         self.containing_dungeon = dungeon
-        self.item_dict = {}
-        self.portal_dict = {}
+
+        if self.portal_dict is None:
+            self.portal_dict = {}
 
         self.discovered_items = {}
         self.discovered_portals = {}
@@ -136,8 +134,11 @@ class Room:
             elif (value.connection_b == name):
                 self.portal_dict[key] = value
 
-        plan = self.plan()
-        self.ingest(plan)
+        if self.planned is None:
+            plan = self.plan()
+            self.ingest(plan)
+            self.planned = True
+            self.containing_dungeon.save()
 
     def ingest(self, room_data):
         """Ingest room data from dictionary format."""
@@ -146,6 +147,8 @@ class Room:
         self.secrets  = room_data.get('secrets', "")
         self.story    = room_data.get('story', "")
         self.effect   = room_data.get('effect', "")
+        self.perceptables = room_data.get('perception_text', "")
+        self.investigables = room_data.get('investigation_text', "")
 
     def display(self):
         """Display the details of the room."""
@@ -159,31 +162,30 @@ class Room:
         """)
 
     def plan(self):
+        
         room_prompt = prompts.room(self)
 
-        response = openai.ChatCompletion.create(
-                    model='gpt-4-0613',
-                        messages=[
-                                    {
-                                        'role':'system', 
-                                        'content': prompts.system()
-                                        
-                                    },
-                                    {
-                                        'role':'user', 
-                                        'content': room_prompt
-                                    }
-                                ],
-                            temperature=0.5
-                            )
+        response = client.chat.completions.create(model=MODEL,
+            messages=[
+                        {
+                            'role':'system', 
+                            'content': prompts.system()
+                            
+                        },
+                        {
+                            'role':'user', 
+                            'content': room_prompt
+                        }
+                    ],
+                temperature=TEMP)
 
         return check_response(response, room_prompt)
 
     def plan_items(self):
-
-        room_items_prompt = prompts.room_items(self)
-        response = openai.ChatCompletion.create(
-            model='gpt-4-0613',
+        if self.item_dict is None:
+            self.item_dict = {}
+            room_items_prompt = prompts.room_items(self)
+            response = client.chat.completions.create(model=MODEL,
                 messages=[
                             {
                                 'role':'system', 
@@ -195,10 +197,10 @@ class Room:
                                 'content': room_items_prompt
                             }
                         ],
-                    temperature=0.5
-                    )
+                    temperature=TEMP)
 
-        self.item_dict = check_response(response, room_items_prompt)
+            self.item_dict = check_response(response, room_items_prompt)
+            self.containing_dungeon.save()
 
     def generate_item(self):
         pass
@@ -208,8 +210,8 @@ class Room:
         for value in self.portal_dict.values():
             value.expand(self)
 
-    def enter(self, player, previous_room = None):
-        print(self.flavour)
+    def enter(self, player, entrance = None):
+        audio.read_text(self.flavour)
 
         if self.unexplored == True:
             print("Generating item plan...")
@@ -220,10 +222,8 @@ class Room:
             self.exapand_portals()
             print("Complete.")
 
-            self.unexplored = False
-
-        if previous_room is not None:
-            self.discovered_items[previous_room.name] = previous_room
+        if entrance is not None:
+            self.discovered_portals[entrance.name] = entrance
 
         for name, value in self.item_dict.items():
             if (value["visibility"] <= player.passive_perception):
@@ -232,6 +232,26 @@ class Room:
         for name, value in self.portal_dict.items():
             if (value.visibility <= player.passive_perception):
                 self.discovered_portals[name] = value
+
+        if self.unexplored == True:
+
+            if len(self.discovered_portals) > 1:
+                audio.read_text("On first entrance you note several exits to the room, including the passage you entered through, these are:")
+                for name in self.discovered_portals:
+                    audio.read_text(name) 
+            else:
+                audio.read_text("There does not seem to be any furter exits to the room, perhaps closer investigation would reveal a path forward. Perhaps not.")
+
+            if len(self.discovered_items) > 0:
+                if len(self.discovered_portals) > 1:
+                    audio.read_text("You also note some items of interest:")
+                else:
+                    audio.read_text("Despite this you note some items of interest:")
+
+                for name in self.discovered_items:
+                    audio.read_text(name) 
+            
+            self.unexplored = False
 
     def observe(self, player):
 
@@ -244,17 +264,62 @@ class Room:
 
         self.perception_roll += player.perception_mod
 
+        if self.perceived is None:
+            self.perceived = {}
+
+        for name, value in self.perceptables.items():
+            if (int(name) <= self.perception_roll ):
+                self.perceived[int(name)] = value
+
+        for difficulty in sorted(self.perceived):
+            value = self.perceived[difficulty]
+            audio.read_text(value)
+        
         for name, value in self.item_dict.items():
             if name not in self.discovered_items.keys():
                 if (value["visibility"] <= self.perception_roll ):
                     self.discovered_items[name] = value
-                    print(f"You discovered: {name}!")
+                    audio.read_text(f"You discovered: {name}!")
 
         for name, value in self.portal_dict.items():
             if name not in self.discovered_portals.keys():
                 if (value.visibility <= self.perception_roll):
                     self.discovered_portals[name] = value
-                    print(f"You discovered: {name}!")
+                    audio.read_text(f"You discovered: {name}!")
+
+    def investigate(self, player):
+
+        if (self.investigate_roll > 0):
+            print("You have already observed this room!")
+            return
+
+        self.investigate_roll = roll20() 
+        print(f"You rolled a {self.perception_roll} + {player.perception_mod} perception check.")
+
+        self.investigate_roll += player.perception_mod
+
+        if self.perceived is None:
+            self.perceived = {}
+
+        for name, value in self.perceptables.items():
+            if (int(name) <= self.perception_roll ):
+                self.perceived[int(name)] = value
+
+        for difficulty in sorted(self.perceived):
+            value = self.perceived[difficulty]
+            audio.read_text(value)
+        
+        for name, value in self.item_dict.items():
+            if name not in self.discovered_items.keys():
+                if (value["visibility"] <= self.perception_roll ):
+                    self.discovered_items[name] = value
+                    audio.read_text(f"You discovered: {name}!")
+
+        for name, value in self.portal_dict.items():
+            if name not in self.discovered_portals.keys():
+                if (value.visibility <= self.perception_roll):
+                    self.discovered_portals[name] = value
+                    audio.read_text(f"You discovered: {name}!")
 
     def listAll(self):
         self.listItems()
@@ -274,6 +339,8 @@ class Dungeon:
 
     def __init__(self, name=None):
         self.name = name
+        self.path = Path(f"./dungeons/{to_snake_case(name)}")
+
         plan = self.plan(name)
         self.ingest(plan)
         self.check_connections()
@@ -305,20 +372,18 @@ class Dungeon:
     def plan(self, name):
 
         dungeon_prompt = prompts.dungeon(name)
-        response = openai.ChatCompletion.create(
-            model='gpt-4-0613',
-                messages=[
-                            {
-                                'role':'system', 
-                                'content': prompts.system()
-                            },
-                            {
-                                'role':'user', 
-                                'content': dungeon_prompt
-                            }
-                        ],
-                    temperature=0.5
-                    )
+        response = client.chat.completions.create(model=MODEL,
+            messages=[
+                        {
+                            'role':'system', 
+                            'content': prompts.system()
+                        },
+                        {
+                            'role':'user', 
+                            'content': dungeon_prompt
+                        }
+                    ],
+                temperature=TEMP)
 
         return check_response(response, dungeon_prompt)
 
@@ -327,21 +392,19 @@ class Dungeon:
         self.portal_pairs = self.get_connected_pairs()
         portal_prompt = prompts.plan_portal(self)
 
-        response = openai.ChatCompletion.create(
-            model='gpt-4-0613',
-                messages=[
-                            {
-                                'role':'system', 
-                                'content': prompts.system()
-                                
-                            },
-                            {
-                                'role':'user', 
-                                'content': portal_prompt
-                            }
-                        ],
-                    temperature=0.5
-                    )
+        response = client.chat.completions.create(model=MODEL,
+            messages=[
+                        {
+                            'role':'system', 
+                            'content': prompts.system()
+                            
+                        },
+                        {
+                            'role':'user', 
+                            'content': portal_prompt
+                        }
+                    ],
+                temperature=TEMP)
 
         self.portal_plan = check_response(response, portal_prompt)
 
@@ -367,7 +430,7 @@ class Dungeon:
     def create_portals(self):
         self.portals = {}
         for key, value in self.portal_plan.items():
-
+            
             self.portals[key] = Portal(
                 name=key,
                 description=value["description"],
@@ -389,7 +452,7 @@ class Dungeon:
                 self.entrances.append(room.name)
 
     def save(self): 
-        with open('dungeon.pickle', 'wb') as handle:
+        with open(self.path, 'wb') as handle:
           pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 @dataclass
@@ -415,21 +478,19 @@ class Portal():
 
         portal_prompt = prompts.portal(room, self)
 
-        response = openai.ChatCompletion.create(
-            model='gpt-4-0613',
-                messages=[
-                            {
-                                'role':'system', 
-                                'content': prompts.system()
-                                
-                            },
-                            {
-                                'role':'user', 
-                                'content': portal_prompt
-                            }
-                        ],
-                    temperature=0.5
-                    )
+        response = client.chat.completions.create(model=MODEL,
+            messages=[
+                        {
+                            'role':'system', 
+                            'content': prompts.system()
+                            
+                        },
+                        {
+                            'role':'user', 
+                            'content': portal_prompt
+                        }
+                    ],
+                temperature=TEMP)
 
         response_dict = check_response(response, portal_prompt)
 
@@ -453,21 +514,19 @@ class Portal():
 
         portal_prompt = prompts.portal_inspect(room, room_b, self)
 
-        response = openai.ChatCompletion.create(
-            model='gpt-4-0613',
-                messages=[
-                            {
-                                'role':'system', 
-                                'content': prompts.system()
-                                
-                            },
-                            {
-                                'role':'user', 
-                                'content': portal_prompt
-                            }
-                        ],
-                    temperature=0.5
-                    )
+        response = client.chat.completions.create(model=MODEL,
+            messages=[
+                        {
+                            'role':'system', 
+                            'content': prompts.system()
+                            
+                        },
+                        {
+                            'role':'user', 
+                            'content': portal_prompt
+                        }
+                    ],
+                temperature=TEMP)
 
         extra_dict = check_response(response, portal_prompt)
 
@@ -478,9 +537,17 @@ class Portal():
         self.force_difficulty = extra_dict["force_difficulty"] 
         self.is_trapped = extra_dict["is_trapped"]
 
+
+def to_snake_case(input_string):
+    # Replace non-alphanumeric characters with an underscore
+    s = re.sub(r'\W+', '_', input_string)
+
+    # Convert to lowercase
+    return s.lower()
+
 def load_or_generate_dungeon(
-    regenerate: bool, 
-    filename: Path
+    name: bool, 
+    force_regenerate: bool = False
     ) -> Dungeon:
 
     """
@@ -498,13 +565,22 @@ def load_or_generate_dungeon(
     Dungeon
         The loaded or regenerated dungeon.
     """
-    if not regenerate and filename.exists():
-        with filename.open('rb') as handle:
+    dungeon_file_name = Path(f"./dungeons/{to_snake_case(name)}")
+
+    if dungeon_file_name.exists() and not force_regenerate:
+        with dungeon_file_name.open('rb') as handle:
             dungeon = pickle.load(handle)
     else:
-        dungeon = Dungeon("The Temple of Old Ricky Bones")
-        with filename.open('wb') as handle:
+        dungeon = Dungeon(name)
+        with dungeon_file_name.open('wb') as handle:
             pickle.dump(dungeon, handle)
+
+    for room in dungeon.rooms.values():
+        room.perception_roll = 0
+        room.explored = False
+        room.discovered_items ={}
+        room.discovered_portals = {}
+
     return dungeon
 
 def cli_loop(dungeon, current_room, player):
@@ -530,21 +606,26 @@ def cli_loop(dungeon, current_room, player):
 def main():
 
     parser = argparse.ArgumentParser(description="Dungeon master's main game loop.")
-    parser.add_argument('--regenerate', action='store_true', help='Force regeneration of the dungeon.')
-    args = parser.parse_args()
+    parser.add_argument('--name', type=str, help='Name the dungeon.')
 
-    openai.api_key_path = Path("./api_key")
-    dungeon_filename = Path("dungeon.pickle")
-    dungeon = load_or_generate_dungeon(args.regenerate, dungeon_filename)
+    args = parser.parse_args()
+    dungeon = load_or_generate_dungeon(args.name)
 
     player = Player()
-    print(f"{dungeon.name}\n{dungeon.flavour}")
-    print(f"There are {len(dungeon.entrances)} entrances to the dungeon:\n")
+    audio.read_text(f"{dungeon.name}\n{dungeon.flavour}")
+
+    if len(dungeon.entrances) > 1: 
+        audio.read_text(f"There are {len(dungeon.entrances)} entrances to the dungeon:\n")
+    else:
+        audio.read_text(f"There is only 1 entrance to the dungeon:\n")
+
 
     for index, entrance in enumerate(dungeon.entrances):
-        print(f"{index}. {entrance}")
+        audio.read_text(f"{index}. {entrance}")
 
-    choice = int(input("Which entrance do you want to use? Enter the number:"))
+    audio.read_text("Which entrance would you like to use?")
+
+    choice = int(input("Enter the number:"))
     current_room = dungeon.rooms[dungeon.entrances[choice]]
     current_room.enter(player)
 

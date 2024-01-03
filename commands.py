@@ -1,3 +1,5 @@
+import audio
+
 class Command:
     def __init__(self, name, description, func):
         self.name = name
@@ -42,7 +44,7 @@ def initialize():
 
     def enter_func(args, dungeon, current_room, player):
         if not args:
-            print("Specify where you'd like to enter.")
+            audio.read_text("Specify the door you'd like to enter.")
             return current_room
 
         portal_name = " ".join(args)
@@ -61,21 +63,21 @@ def initialize():
                 portal.inspect(current_room, new_room)
 
             if not portal.is_passable:
-                print(portal.failed_entry_text)
+                audio.read_text(portal.failed_entry_text)
                 return current_room
             else:
-                print(portal.entry_text)
+                audio.read_text(portal.entry_text)
 
-                new_room.enter(player, current_room)
+                new_room.enter(player, portal)
                 return new_room
         else:
-            print(f"No portal named {portal_name} found in the current room.")
+            print(f"There is no entryway named {portal_name} found in the current room.")
             return current_room
 
     def pick_func(args, dungeon, current_room, player):
 
         if not args:
-            print("Specify what you'd like to pick.")
+            audio.read_text("Specify what you'd like to pick.")
 
         portal_name = " ".join(args)
 
@@ -84,15 +86,15 @@ def initialize():
             portal = current_room.discovered_portals[portal_name]
 
             if not portal.is_locked:
-                print("Door not locked.")
+                audio.read_text("Door not locked.")
                 return current_room
             else:
-                print(portal.entry_text)
+                audio.read_text(portal.entry_text)
 
                 new_room.enter(player, current_room)
                 return new_room
         else:
-            print(f"No portal named {portal_name} found in the current room.")
+            audio.read_text(f"This is no entryway named {portal_name} found in the current room.")
             return current_room
 
 
