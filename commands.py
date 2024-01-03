@@ -47,32 +47,38 @@ def initialize():
             audio.read_text("Specify the door you'd like to enter.")
             return current_room
 
-        portal_name = " ".join(args)
-        if portal_name in current_room.discovered_portals:
-
+        # Check if the argument is a number (index)
+        if args[0].isdigit():
+            index = int(args[0])
+            portal_name, portal = current_room.getEgressByIndex(index)
+            if not portal:
+                print(f"No entryway found at index {index}.")
+                return current_room
+        else:
+            portal_name = " ".join(args)
+            if portal_name not in current_room.discovered_portals:
+                print(f"There is no entryway named {portal_name} found in the current room.")
+                return current_room
             portal = current_room.discovered_portals[portal_name]
 
-            if current_room.name != portal.connection_a:
-                new_room_name = portal.connection_a
-            else:
-                new_room_name = portal.connection_b
-
-            new_room = dungeon.rooms[new_room_name]
-
-            if not portal.inspected:
-                portal.inspect(current_room, new_room)
-
-            if not portal.is_passable:
-                audio.read_text(portal.failed_entry_text)
-                return current_room
-            else:
-                audio.read_text(portal.entry_text)
-
-                new_room.enter(player, portal)
-                return new_room
+        # Remaining logic for entering the portal
+        if current_room.name != portal.connection_a:
+            new_room_name = portal.connection_a
         else:
-            print(f"There is no entryway named {portal_name} found in the current room.")
+            new_room_name = portal.connection_b
+
+        new_room = dungeon.rooms[new_room_name]
+
+        if not portal.inspected:
+            portal.inspect(current_room, new_room)
+
+        if not portal.is_passable:
+            audio.read_text(portal.failed_entry_text)
             return current_room
+        else:
+            audio.read_text(portal.entry_text)
+            new_room.enter(player, portal)
+            return new_room
 
     def pick_func(args, dungeon, current_room, player):
 

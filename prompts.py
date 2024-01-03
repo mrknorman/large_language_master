@@ -1,3 +1,7 @@
+from openai import OpenAI
+client = OpenAI(api_key=open('./api_key', 'r').read())
+import json
+
 SYSTEM = \
 f"""
     You are an expert dungeon master with many years of experience and a
@@ -20,7 +24,7 @@ DUNGEON = """
     when prompted for specific information. Ensure there is enough detail to avoid incosistencies and to tell 
     a cohesive story, even if your future self is not presnted with infomation about the other rooms.
 
-    Respond with an outline in the following json format that can be converted into a python dictionary with python's json.loads function:
+    Respond with an outline in the following JSON format that can be converted into a python dictionary with python's json.loads function:
     {{
         "purpose" : str, # the in universe purpose of the dungeon
         "flavour" : str, # A description of the dungeon containing only information that your players would know before entering
@@ -213,7 +217,7 @@ PORTAL = \
 
         I would like you to decide on the visibility and hit points of this traversal-point.
 
-        Respond in the following json ready format that can be read by python's json.loads function.
+        Respond in the following JSON ready format that can be read by python's json.loads function.
         {{
             "visibility:" int #see below,
             "hit_points:" int, #door health where 10 is an average wooden door
@@ -271,7 +275,7 @@ PORTAL_INSPECT = """
         to the flavour for very high visibilities 15-30 (high visibility equals harder to see)
 
         I would like to to design some more detailed description of the
-        traversal-point. Respond in the following json string that can be read by python's json.loads function.
+        traversal-point. Respond in the following JSON string that can be read by python's json.loads function.
 
         {{
             "flavour_text" : str, #paragraph to give to the player, adding to 
@@ -435,4 +439,61 @@ def portal_inspect(room, room_b, portal):
         portal_asymmetry = portal.asymmetries[room.name],
         portal_hit_points = portal.hit_points,
         portal_visibility = portal.visibility
+    )
+
+def check_response(
+    model,
+    response, 
+    prompt,
+    temprature,
+    system_prompt = SYSTEM
+):
+    try:
+        response = json.loads(response.choices[0].message.content)
+    except Exception as e:
+        error_prompt = \
+            (f"Your previous response: [{response}] to this prompt: [{prompt}], returned this error: [{e}], when attempting to convert it to a python"
+            "dictionary with json.loads, please try again. Respond only in a format that can be read as a JSON by python's json.loads function,"
+            " anything else will result in an error.")
+
+        print(f"Error, trying again: {e}")
+
+        response = prompt(
+            error_prompt,
+            model,
+            temprature,
+            system_prompt=system_prompt,
+        )
+
+    return response
+
+def prompt(
+    prompt,
+    model,
+    temprature,
+    system_prompt = SYSTEM
+):
+    response = client.chat.completions.create(
+        model=model,
+        response_format={"type": "json_object"},
+        messages=[
+            {
+                'role':'system', 
+                'content': system_prompt
+                
+            },
+            {
+                'role':'user', 
+                'content': prompt
+            }
+        ],
+        temperature=temprature
+    )
+
+    return check_response(
+        model,
+        response, 
+        prompt,
+        temprature,
+        system_prompt=system_prompt,
     )

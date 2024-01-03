@@ -12,7 +12,7 @@ from openai import OpenAI
 
 client = OpenAI(api_key=open('./api_key', 'r').read())
 
-MODEL = "gpt-4"
+MODEL = "gpt-4-1106-preview"
 TEMP = 0.7
 from tqdm import tqdm
 
@@ -46,34 +46,6 @@ class Player():
     perception_mod : int = ((perception - 10) // 2)
 
     passive_perception : int = perception
-
-def check_response(response, prompt):
-    try:
-        response = json.loads(response.choices[0].message.content)
-    except Exception as e:
-        error_prompt = \
-            f"Your previous response: [{response}] to this prompt: [{prompt}], had this error: [{e}], please try again." \
-            "Respond only in a format that can be read as a JSON by python's json.loads function, anything else will result in an error."
-
-        print(f"Error, trying again: {e}")
-
-        response = client.chat.completions.create(model=MODEL,
-            messages=[
-                        {
-                            'role':'system', 
-                            'content': prompts.system()
-                            
-                        },
-                        {
-                            'role':'user', 
-                            'content': error_prompt
-                        }
-                    ],
-                temperature=TEMP)
-
-        response = check_response(response, prompt)
-
-    return response
 
 class boundary():
     verticies = []
@@ -162,44 +134,20 @@ class Room:
         """)
 
     def plan(self):
-        
-        room_prompt = prompts.room(self)
-
-        response = client.chat.completions.create(model=MODEL,
-            messages=[
-                        {
-                            'role':'system', 
-                            'content': prompts.system()
-                            
-                        },
-                        {
-                            'role':'user', 
-                            'content': room_prompt
-                        }
-                    ],
-                temperature=TEMP)
-
-        return check_response(response, room_prompt)
+        return prompts.prompt(
+            prompts.room(self),
+            MODEL,
+            TEMP,
+        )
 
     def plan_items(self):
         if self.item_dict is None:
-            self.item_dict = {}
-            room_items_prompt = prompts.room_items(self)
-            response = client.chat.completions.create(model=MODEL,
-                messages=[
-                            {
-                                'role':'system', 
-                                'content': prompts.system()
-                                
-                            },
-                            {
-                                'role':'user', 
-                                'content': room_items_prompt
-                            }
-                        ],
-                    temperature=TEMP)
-
-            self.item_dict = check_response(response, room_items_prompt)
+            
+            self.item_dict = prompts.prompt(
+                prompts.room_items(self),
+                MODEL,
+                TEMP,
+            )
             self.containing_dungeon.save()
 
     def generate_item(self):
@@ -327,13 +275,35 @@ class Room:
 
     def listItems(self):
         print("Discovered Items:")
-        for index, (name, value) in enumerate(self.discovered_items.items()): 
+        sorted_items = sorted(self.discovered_items.items())
+        for index, (name, value) in enumerate(sorted_items): 
             print(f"{index}. {name}")
 
     def listEgress(self):
-        print("Discovered Egress Points:")
-        for index, (name, value) in enumerate(self.discovered_portals.items()): 
+        print("Discovered Entrances/Exits:")
+        sorted_egress = sorted(self.discovered_portals.items())
+        for index, (name, value) in enumerate(sorted_egress): 
             print(f"{index}. {name}")
+    
+    def getItemByIndex(self, index):
+        """Return the item at the specified index."""
+        sorted_items = sorted(self.discovered_items.items())
+        if 0 <= index < len(sorted_items):
+            item_name, item_value = sorted_items[index]
+            return item_value
+        else:
+            print("No item of that name is known.")
+            return None
+
+    def getEgressByIndex(self, index):
+        """Return the egress point at the specified index."""
+        sorted_egress = sorted(self.discovered_portals.items())
+        if 0 <= index < len(sorted_egress):
+            egress_name, egress_value = sorted_egress[index]
+            return egress_name, egress_value
+        else:
+            print("No exit/entrance of that name is known.")
+            return None
 
 class Dungeon:
 
@@ -371,42 +341,20 @@ class Dungeon:
 
     def plan(self, name):
 
-        dungeon_prompt = prompts.dungeon(name)
-        response = client.chat.completions.create(model=MODEL,
-            messages=[
-                        {
-                            'role':'system', 
-                            'content': prompts.system()
-                        },
-                        {
-                            'role':'user', 
-                            'content': dungeon_prompt
-                        }
-                    ],
-                temperature=TEMP)
-
-        return check_response(response, dungeon_prompt)
+        return prompts.prompt(
+            prompts.dungeon(name),
+            MODEL,
+            TEMP,
+        )
 
     def plan_portals(self):
 
         self.portal_pairs = self.get_connected_pairs()
-        portal_prompt = prompts.plan_portal(self)
-
-        response = client.chat.completions.create(model=MODEL,
-            messages=[
-                        {
-                            'role':'system', 
-                            'content': prompts.system()
-                            
-                        },
-                        {
-                            'role':'user', 
-                            'content': portal_prompt
-                        }
-                    ],
-                temperature=TEMP)
-
-        self.portal_plan = check_response(response, portal_prompt)
+        self.portal_plan = prompts.prompt(
+            prompts.plan_portal(self),
+            MODEL,
+            TEMP,
+        )
 
     def check_connections(self):  
 
@@ -476,24 +424,12 @@ class Portal():
 
     def expand(self, room):
 
-        portal_prompt = prompts.portal(room, self)
-
-        response = client.chat.completions.create(model=MODEL,
-            messages=[
-                        {
-                            'role':'system', 
-                            'content': prompts.system()
-                            
-                        },
-                        {
-                            'role':'user', 
-                            'content': portal_prompt
-                        }
-                    ],
-                temperature=TEMP)
-
-        response_dict = check_response(response, portal_prompt)
-
+        response_dict = prompts.prompt(
+            prompts.portal(room, self),
+            MODEL,
+            TEMP,
+        )
+        
         self.visibility = response_dict["visibility"]
         self.hit_points = response_dict["hit_points"]
 
@@ -511,24 +447,12 @@ class Portal():
         self.is_passable = not (self.is_locked or self.is_locked or self.is_barricaded)
 
     def inspect(self, room, room_b):
-
-        portal_prompt = prompts.portal_inspect(room, room_b, self)
-
-        response = client.chat.completions.create(model=MODEL,
-            messages=[
-                        {
-                            'role':'system', 
-                            'content': prompts.system()
-                            
-                        },
-                        {
-                            'role':'user', 
-                            'content': portal_prompt
-                        }
-                    ],
-                temperature=TEMP)
-
-        extra_dict = check_response(response, portal_prompt)
+        
+        extra_dict = prompts.prompt(
+            prompts.portal_inspect(room, room_b, self),
+            MODEL,
+            TEMP
+        )
 
         self.flavour_text = extra_dict["flavour_text"]
         self.failed_entry_text = extra_dict["failed_entry_text"]
@@ -617,7 +541,7 @@ def main():
     if len(dungeon.entrances) > 1: 
         audio.read_text(f"There are {len(dungeon.entrances)} entrances to the dungeon:\n")
     else:
-        audio.read_text(f"There is only 1 entrance to the dungeon:\n")
+        audio.read_text(f"There is only one entrance to the dungeon:\n")
 
 
     for index, entrance in enumerate(dungeon.entrances):
