@@ -13,8 +13,7 @@ f"""
 
     IMPORTANT: All responses must be structured to be compatible with Python's json.loads function for seamless conversion into a Python dictionary. This ensures your creative content can be easily incorporated into the gaming framework.
 """
-DUNGEON_ATTRIBUTES = ["name", "purpose", "flavour", "secrets", "story", "effect"]
-DUNGEON_ARGUMENTS = ["name", "num_rooms"]
+
 DUNGEON = """
     Design a dungeon named {name} for an adventuring party. It will have {num_rooms} rooms, focusing initially on the dungeon's layout and overarching narrative. 
 
@@ -43,38 +42,57 @@ DUNGEON = """
     }}
 """
 
-ROOM_ATTRIBUTES = ["name", "purpose", "flavour", "secrets", "story", "effect"]
-ROOM_ARGUMENTS = ["name", "num_rooms"]
 ROOM = """
-    Design a new room, {room_name}, for your dungeon. This room is part of a larger dungeon with the following characteristics:
+    You are designing a new room for your adventuring party to explore.
+    Here is a description of the dungeon that contains the room:
 
-    {header}
+    Name: {dungeon_name}
+    Purpose: {dungeon_purpose}
+    Flavour: {dungeon_flavour}
+    Secrets: {dungeon_secrets}
+    Story: {dungeon_story}
+    Effect: {dungeon_effect}
 
-    Initially, players will encounter only the room's name and flavour text. Use the other details to guide the room's design, ensuring consistency with the dungeon's overall story and theme.
+    Your players will only see the name and the flavour text. The others are notes for your future self
+    to use when generating the room's details, to ensure consistency. Ensure there is enough detail to avoid
+    incosistencies and to tell a cohesive story.
 
-    Traversable Entrances/Exits: {room_portals}
-    Align the room's description, investigation, and perception details with these entrances/exits for a cohesive player experience. The visibility of traversal points should match the difficulty of perceiving them. If a traversal point is less visible, it should not be easily detected in the room's flavour text.
+    This room is called {room_name} and has the following traversable entrances/exits: {room_portals}.
 
-    Format your response as a JSON-like string for Python's json.loads function:
+    Attempt to match the description of the room, and investigation and perception findings, to the description
+    of the entrances/exits given above. Aim for consistency to create a cohesive experience for your players.
+    If a traversal-point has a certain visibility, perception information relating to that traversal-point
+    should have a visibility difficulty less than or equal to that visibility. Similarly, if a traversal-point
+    is has a high visibility difficulty, ensure it is not mentioned in the room flavour text.
+
+    Respond with a brief outline in the following format imitating a JSON string that can be read by python's json.loads function:
     {{
-        "purpose": "In-universe purpose",
-        "flavour": {{
-            "0": "First impression description",
-            "1": "Second entry description",
-            ... # Additional entries as desired
+        "purpose": str, # The in universe purpose of the room
+        "flavour": dict = {{
+            "0" : # A rich description the players first impressions when entering the room, note that this should not describe moving through any doors or passages, as that is handled seperately.
+            "1" : # A description to read the second time the players enter the room, this could be noting an extra detail, a feeling of bordem, or a creeping sense of dread at the repetition, be creative with the desription.
+            ... continue for as many as you desire, each time descibing the player's experience entering the room for the nth time.
         }},
-        "secrets": "Room secrets",
-        "story": "Underlying story",
-        "effect": "Effect on players",
-        "investigation_text": {{
-            "0": "Basic investigation information",
-            "roll_required (out of 30)": "Information for a specific intelligence roll",
-            ... # Additional information as needed
+        "secrets": str, # Any secrets the room may hold
+        "story": str, # The underlying story you want the room to tell
+        "effect": str, # The effect you imagine this room will have on the players' stories
+        "investigation_text" : dict = {{ 
+            # A dictionary showing intelligence roll required and revealed information
+            # this should be information revealed by thoughtfull consideration not
+            # perception.
+            "0" : str # Generic information that is always revealed when investigated, giving an impression of the room 
+            "roll_required : int as string (out of 30)" : str, #information revealed
+            "higher_roll_required : int as string (out of 30)" : str, #more infomation revealed
+            # more or less information as desired, could be none
         }},
-        "perception_text": {{
-            "0": "Basic perception information",
-            "roll_required (out of 30)": "Information for a specific perception roll",
-            ... # Additional information as needed
+        "perception_text": dict = {{
+            # A dictionary showing perception roll required and revealed information
+            # this should be information revealed by close inspection not
+            # intellient investigation.
+            "0" : str # Generic information that is always revealed when perceived, giving an impression of the room 
+            "roll_required : int as string (out of 30)" : str, #information revealed
+            "higher_roll_required : int as string (out of 30)" : str, #more infomation revealed
+            # more or less information as desired, could be none
         }}
     }}
 """
@@ -122,22 +140,13 @@ ROOM_ITEMS = """
     Note: visibility can take any value between 1 and 30, not just these examples.
 """
 
-DUNGEON_PORTALS_ARGUMENTS = ["header", "portals"]
-DUNGEON_PORTALS = \
+PLAN_PORTAL = \
 """
     As you design a dungeon for your adventuring party, focus on creating traversal points between rooms. These can be doors, tunnels, ladders, staircases, or other connectors. Mix mundane and extraordinary elements to keep the dungeon both grounded and exciting.
 
-    Here is some contextual infomation about the dungeon:
-
-    {header}
-
-    And here is a list of connected pairs of rooms, each of which require a traversal point:
-
-    {portals}
-
     For each traversal point, devise a descriptive name and a detailed description for consistency. Note any asymmetries where the experience of traversing differs based on direction.
 
-    Format your response as a JSON string compatible with Python's json.loads function, with the following structure:
+    Use the provided list of connected pairs {portal_pairs} to structure your response. Format your response as a JSON string compatible with Python's json.loads function, with the following structure:
     {{
         "descriptive_traversal_point_name": {{
             "description": "Aesthetic and functional details",
@@ -266,3 +275,161 @@ PORTAL_INSPECT = """
     # more or less information as desired, could be none
 }}
 """
+
+def system():
+    return SYSTEM
+
+def dungeon(
+        name, 
+        min_num_rooms, 
+        max_num_rooms
+    ):
+
+    return DUNGEON.format(
+        name=name,
+        num_rooms=random.randint(min_num_rooms, max_num_rooms)
+    )
+
+def room_items(room):
+
+    dungeon = room.containing_dungeon
+
+    return ROOM_ITEMS.format(
+        dungeon_name=dungeon.name,
+        dungeon_purpose=dungeon.purpose,
+        dungeon_flavour=dungeon.flavour,
+        dungeon_secrets=dungeon.secrets,
+        dungeon_story=dungeon.story,
+        dungeon_effect=dungeon.effect,
+        room_name=room.name,
+        room_connected_to=", ".join(room.connected_to),
+        room_purpose=room.purpose,
+        room_flavour=room.flavour,
+        room_secrets=room.secrets,
+        room_story=room.story,
+        room_effect=room.effect,
+        room_perceptables = room.perceptables,
+        room_investigables=room.investigables, 
+    )
+
+def room(room):
+
+    dungeon = room.containing_dungeon
+    room_portals = [
+        portal.name + ": " + portal.description + " " + str(portal.asymmetries[room.name]) for portal in room.portal_dict.values()
+    ]
+
+    return ROOM.format(
+        dungeon_name=dungeon.name,
+        dungeon_purpose=dungeon.purpose,
+        dungeon_flavour=dungeon.flavour,
+        dungeon_secrets=dungeon.secrets,
+        dungeon_story=dungeon.story,
+        dungeon_effect=dungeon.effect,
+        room_name=room.name,
+        room_portals=room_portals
+    )
+
+def plan_portal(dungeon):
+
+    return PLAN_PORTAL.format(
+        dungeon_name=dungeon.name,
+        dungeon_purpose=dungeon.purpose,
+        dungeon_flavour=dungeon.flavour,
+        dungeon_secrets=dungeon.secrets,
+        dungeon_story=dungeon.story,
+        dungeon_effect=dungeon.effect,
+        portal_pairs=dungeon.portal_pairs
+    )
+
+def portal_inspect(room, room_b, portal):
+
+    dungeon = room.containing_dungeon
+    return PORTAL_INSPECT.format(
+        dungeon_name=dungeon.name,
+        dungeon_purpose=dungeon.purpose,
+        dungeon_flavour=dungeon.flavour,
+        dungeon_secrets=dungeon.secrets,
+        dungeon_story=dungeon.story,
+        dungeon_effect=dungeon.effect,
+        room_name=room.name,
+        room_connected_to=", ".join(room.connected_to),
+        room_purpose=room.purpose,
+        room_flavour=room.flavour,
+        room_secrets=room.secrets,
+        room_story=room.story,
+        room_effect=room.effect,
+        room_b_name=room_b.name,
+        room_b_purpose=room_b.purpose,
+        room_b_flavour=room_b.flavour,
+        room_b_secrets=room_b.secrets,
+        room_b_story=room_b.story,
+        room_b_effect=room_b.effect,
+        room_perceptables_a = room.perceptables,
+        room_investigables_a=room.investigables, 
+        room_perceptables_b = room_b.perceptables,
+        room_investigables_b =room_b.investigables, 
+        portal_name = portal.name,
+        portal_description = portal.description,
+        portal_conditions = portal.conditions,
+        portal_asymmetry = portal.asymmetries[room.name],
+        portal_hit_points = portal.hit_points,
+        portal_visibility = portal.visibility
+    )
+
+def check_response(
+    model,
+    response, 
+    prompt,
+    temprature,
+    system_prompt = SYSTEM
+):
+    try:
+        response = json.loads(response.choices[0].message.content)
+    except Exception as e:
+        error_prompt = \
+            (f"Your previous response: [{response}] to this prompt: [{prompt}], returned this error: [{e}], when attempting to convert it to a python"
+            "dictionary with json.loads, please try again. Respond only in a format that can be read as a JSON by python's json.loads function,"
+            " anything else will result in an error.")
+
+        print(f"Error, trying again: {e}")
+
+        response = prompt(
+            error_prompt,
+            model,
+            temprature,
+            system_prompt=system_prompt,
+        )
+
+    return response
+
+def request_response(
+    prompt,
+    model,
+    temprature,
+    system_prompt = SYSTEM
+):
+    response = client.chat.completions.create(
+        model=model,
+        response_format={"type": "json_object"},
+        messages=[
+            {
+                'role':'system', 
+                'content': system_prompt
+                
+            },
+            {
+                'role':'user', 
+                'content': prompt
+            }
+        ],
+        temperature=temprature
+    )
+
+    return check_response(
+        model,
+        response, 
+        prompt,
+        temprature,
+        system_prompt=system_prompt,
+    )

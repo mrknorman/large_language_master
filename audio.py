@@ -23,7 +23,7 @@ def print_sentence_with_timing(sentence, mp3_path):
 		print(word, end=' ', flush=True)
 		time.sleep(word_duration)
 	
-	print("\n")
+	print("")
 
 def text_to_sha256_hash(text):
     encoded_text = text.encode()
