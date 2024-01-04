@@ -9,6 +9,9 @@ class Command:
     def execute(self, args, dungeon, current_room, player):
         return self.func(args, dungeon, current_room, player)
 
+def roll20():
+    return np.random.randint(1, 21)
+
 def initialize():
     """Initialize and return the dictionary of command instances."""
 
@@ -60,6 +63,54 @@ def initialize():
                 print(f"There is no entryway named {portal_name} found in the current room.")
                 return current_room
             portal = current_room.discovered_portals[portal_name]
+        
+        # Remaining logic for entering the portal
+        if current_room.name != portal.connection_a:
+            new_room_name = portal.connection_a
+        else:
+            new_room_name = portal.connection_b
+
+        new_room = dungeon.rooms[new_room_name]
+
+        first_time = False
+        if not portal.used:
+            first_time = True
+            portal.inspect(current_room, new_room)
+
+        portal.is_passable = not (portal.is_locked or portal.is_barricaded or portal.is_barricaded)        
+        if not portal.is_passable:
+            try:
+                audio.read_text(portal.failed_entry_text[str(portal.failed_attempts)])
+            except:
+                max_tries = list(sorted(portal.failed_entry_text))[-1]
+                audio.read_text(max_tries)
+
+            portal.failed_attempts += 1
+            return current_room
+        else:
+            if first_time:
+                audio.read_text(portal.entry_text)
+            new_room.enter(player, portal)
+            portal.used = True
+            return new_room
+
+    def pick_func(args, dungeon, current_room, player):
+
+        if not args:
+            audio.read_text("Specify what you'd like to pick.")
+
+        # Check if the argument is a number (index)
+        if args[0].isdigit():
+            index = int(args[0])
+            portal_name, portal = current_room.getEgressByIndex(index)
+            if not portal:
+                print(f"No entryway found at index {index}.")
+        else:
+            portal_name = " ".join(args)
+            if portal_name not in current_room.discovered_portals:
+                print(f"There is no entryway named {portal_name} found in the current room.")
+            
+            portal = current_room.discovered_portals[portal_name]
 
         # Remaining logic for entering the portal
         if current_room.name != portal.connection_a:
@@ -69,47 +120,27 @@ def initialize():
 
         new_room = dungeon.rooms[new_room_name]
 
-        if not portal.inspected:
+        first_time = False
+        if not portal.used:
+            first_time = True
             portal.inspect(current_room, new_room)
-
-        if not portal.is_passable:
-            audio.read_text(portal.failed_entry_text)
-            return current_room
-        else:
-            audio.read_text(portal.entry_text)
-            new_room.enter(player, portal)
-            return new_room
-
-    def pick_func(args, dungeon, current_room, player):
-
-        if not args:
-            audio.read_text("Specify what you'd like to pick.")
-
-        portal_name = " ".join(args)
 
         if portal_name in current_room.discovered_portals:
 
             portal = current_room.discovered_portals[portal_name]
+            portal.pick(player)
 
-            if not portal.is_locked:
-                audio.read_text("Door not locked.")
-                return current_room
-            else:
-                audio.read_text(portal.entry_text)
-
-                new_room.enter(player, current_room)
-                return new_room
         else:
             audio.read_text(f"This is no entryway named {portal_name} found in the current room.")
-            return current_room
-
 
     list_command = Command("list", "List details. Use: list <all/items/portal>", list_func)
     observe_command = Command("observe", "Observe the current room.", observe_func)
     enter_command = Command("enter", "Enter a specified portal. Use: enter <portal_name>", enter_func)
+    pick_command = Command("pick", "Enter a specified portal. Use: enter <portal_name>", pick_func)
 
     return {
         list_command.name: list_command,
         observe_command.name: observe_command,
-        enter_command.name: enter_command
+        enter_command.name: enter_command,
+        pick_command.name: pick_command
     }

@@ -33,17 +33,28 @@ import audio
 def roll20():
     return np.random.randint(1, 21)
 
+def find_nearest_lower_np(arr, num):
+    arr = np.array(arr)
+    filtered_arr = arr[arr <= num]
+    if filtered_arr.size > 0:
+        return filtered_arr.max()
+    else:
+        return None
+
 @dataclass
 class Player():
     strength : int = 10
-    dexterity : int = 10
+    dexterity : int = 100
     constitution : int = 10
-    inteligence : int = 120
+    inteligence : int = 12
     wisdom : int = 10
     charisma : int = 10
 
-    perception : int = inteligence
+    perception : int = wisdom
     perception_mod : int = ((perception - 10) // 2)
+
+    lockpick : int = dexterity
+    lockpick_mod : int = ((dexterity - 10) // 2)
 
     passive_perception : int = perception
 
@@ -67,6 +78,9 @@ class structure():
     boundary = []
     floor = []
 
+#class Area:
+
+
 class Room:
 
     structure  = None
@@ -82,6 +96,7 @@ class Room:
     perceived = None
 
     perception_roll = 0
+    times_visited = 0
     unexplored = True
 
     def __init__(self, name, room_dict, dungeon):
@@ -100,17 +115,20 @@ class Room:
         self.discovered_items = {}
         self.discovered_portals = {}
 
-        for key, value in dungeon.portals.items():
-            if (value.connection_a == name):
-                self.portal_dict[key] = value
-            elif (value.connection_b == name):
-                self.portal_dict[key] = value
+        self.get_portals()
 
         if self.planned is None:
             plan = self.plan()
             self.ingest(plan)
             self.planned = True
             self.containing_dungeon.save()
+
+    def get_portals(self):
+        for key, value in self.containing_dungeon.portals.items():
+            if (value.connection_a == self.name):
+                self.portal_dict[key] = value
+            elif (value.connection_b == self.name):
+                self.portal_dict[key] = value
 
     def ingest(self, room_data):
         """Ingest room data from dictionary format."""
@@ -134,7 +152,7 @@ class Room:
         """)
 
     def plan(self):
-        return prompts.prompt(
+        return prompts.request_response(
             prompts.room(self),
             MODEL,
             TEMP,
@@ -143,7 +161,7 @@ class Room:
     def plan_items(self):
         if self.item_dict is None:
             
-            self.item_dict = prompts.prompt(
+            self.item_dict = prompts.request_response(
                 prompts.room_items(self),
                 MODEL,
                 TEMP,
@@ -153,13 +171,17 @@ class Room:
     def generate_item(self):
         pass
 
-    def exapand_portals(self):
-
+    def expand_portals(self):
         for value in self.portal_dict.values():
-            value.expand(self)
+            value.expand()
 
     def enter(self, player, entrance = None):
-        audio.read_text(self.flavour)
+        try:
+            audio.read_text(self.flavour[str(self.times_visited)])
+        except:
+            audio.read_text(list(sorted(self.flavour).values())[-1])
+        
+        self.times_visited += 1
 
         if self.unexplored == True:
             print("Generating item plan...")
@@ -167,8 +189,14 @@ class Room:
             print("Complete.")
 
             print("Expanding portals...")
-            self.exapand_portals()
+            self.expand_portals()
             print("Complete.")
+
+        if self.discovered_portals is None:
+            self.discovered_portals = {}
+        
+        if self.discovered_items is None:
+            self.discovered_items = {}
 
         if entrance is not None:
             self.discovered_portals[entrance.name] = entrance
@@ -178,26 +206,26 @@ class Room:
                 self.discovered_items[name] = value
 
         for name, value in self.portal_dict.items():
-            if (value.visibility <= player.passive_perception):
+            if (value.visibility[self.name] <= player.passive_perception):
                 self.discovered_portals[name] = value
 
         if self.unexplored == True:
 
-            if len(self.discovered_portals) > 1:
+            if len(self.discovered_portals) > 1 and entrance is not None:
                 audio.read_text("On first entrance you note several exits to the room, including the passage you entered through, these are:")
-                for name in self.discovered_portals:
-                    audio.read_text(name) 
+                for index, name in enumerate(sorted(self.discovered_portals)):
+                    audio.read_text(f"{index}. {name}") 
             else:
-                audio.read_text("There does not seem to be any furter exits to the room, perhaps closer investigation would reveal a path forward. Perhaps not.")
+                audio.read_text("There do not seem to be any further exits to the room, perhaps closer investigation would reveal a path forward, perhaps not.")
 
-            if len(self.discovered_items) > 0:
+            if len(self.discovered_items) > 0 or entrance is None:
                 if len(self.discovered_portals) > 1:
                     audio.read_text("You also note some items of interest:")
                 else:
-                    audio.read_text("Despite this you note some items of interest:")
+                    audio.read_text("Despite this, you note some items of interest:")
 
-                for name in self.discovered_items:
-                    audio.read_text(name) 
+                for index, name in enumerate(sorted(self.discovered_items)):
+                    audio.read_text(f"{index}. {name}") 
             
             self.unexplored = False
 
@@ -216,7 +244,7 @@ class Room:
             self.perceived = {}
 
         for name, value in self.perceptables.items():
-            if (int(name) <= self.perception_roll ):
+            if (int(name) <= self.perception_roll):
                 self.perceived[int(name)] = value
 
         for difficulty in sorted(self.perceived):
@@ -231,7 +259,7 @@ class Room:
 
         for name, value in self.portal_dict.items():
             if name not in self.discovered_portals.keys():
-                if (value.visibility <= self.perception_roll):
+                if (value.visibility[self.name] <= self.perception_roll):
                     self.discovered_portals[name] = value
                     audio.read_text(f"You discovered: {name}!")
 
@@ -303,8 +331,16 @@ class Room:
             return egress_name, egress_value
         else:
             print("No exit/entrance of that name is known.")
-            return None
-
+            return None, None
+    
+    def reset(self):
+        self.perceived = None
+        self.perception_roll = 0
+        self.unexplored = True
+        self.discovered_items = None
+        self.discovered_portals = None
+        self.times_visited = 0
+        
 class Dungeon:
 
     def __init__(self, name=None):
@@ -314,8 +350,7 @@ class Dungeon:
         plan = self.plan(name)
         self.ingest(plan)
         self.check_connections()
-        self.plan_portals()
-        self.create_portals()
+        self.generate_portals()
         self.create_rooms()
         self.find_entrances()
 
@@ -341,20 +376,36 @@ class Dungeon:
 
     def plan(self, name):
 
-        return prompts.prompt(
-            prompts.dungeon(name),
+        return prompts.request_response(
+            prompts.dungeon(name, 15, 20),
             MODEL,
             TEMP,
         )
 
-    def plan_portals(self):
+    def generate_portals(self):
 
         self.portal_pairs = self.get_connected_pairs()
-        self.portal_plan = prompts.prompt(
+        self.portal_plan = prompts.request_response(
             prompts.plan_portal(self),
             MODEL,
             TEMP,
         )
+        self.ingest_portals()
+
+    def ingest_portals(self):
+
+        self.portals = {}
+        for key, value in self.portal_plan.items():
+            self.portals[key] = Portal(
+                name=key,
+                description=value["description"],
+                hit_points=value["hit_points"],
+                conditions=value["conditions"],
+                connection_a=list(value["asymmetries"].keys())[0],
+                connection_b=list(value["asymmetries"].keys())[1],
+                asymmetries=value["asymmetries"],
+                containing_dungeon=self
+            )
 
     def check_connections(self):  
 
@@ -375,19 +426,6 @@ class Dungeon:
 
         return connected_pairs
 
-    def create_portals(self):
-        self.portals = {}
-        for key, value in self.portal_plan.items():
-            
-            self.portals[key] = Portal(
-                name=key,
-                description=value["description"],
-                conditions=value["conditions"],
-                connection_a=list(value["asymmetries"].keys())[0],
-                connection_b=list(value["asymmetries"].keys())[1],
-                asymmetries=value["asymmetries"]
-        )
-
     def create_rooms(self):
         self.rooms = {}
         for name, value in tqdm(self.room_dicts.items()):
@@ -403,11 +441,21 @@ class Dungeon:
         with open(self.path, 'wb') as handle:
           pickle.dump(self, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
+    def reset(self):
+        for room in self.rooms.values():
+            room.reset()
+
+        self.ingest_portals()
+
+        for portal in self.portals.values():
+            portal.reset()
+
 @dataclass
 class Portal():
 
     name : str
     description : str
+    hit_points : int
     conditions : str
 
     connection_a : str
@@ -415,28 +463,42 @@ class Portal():
 
     asymmetries : dict
 
+    containing_dungeon : Dungeon
+
     inspected : bool = False
+    used : bool = False
 
     visibility : int = -1
     lock_difficulty : int = -1
+    failed_attempts = 0 
+    
+    is_locked : bool = False
+    is_blocked : bool = False
+    is_barricaded : bool = False
+
+    lock_damage_mod = 0 
+    lock_broken = False
+    broken_attempts = 0
+
+    failed_entry_text = None
+
+    pick_attempts = 0
 
     room_info = {}
 
-    def expand(self, room):
+    def __post_init__(self):
+        self.inital_conditions = self.conditions
 
-        response_dict = prompts.prompt(
-            prompts.portal(room, self),
-            MODEL,
-            TEMP,
-        )
-        
-        self.visibility = response_dict["visibility"]
-        self.hit_points = response_dict["hit_points"]
+    def reset(self):
+        self.conditions = self.inital_conditions
 
-        self.is_locked = False
-        self.is_locked = False
-        self.is_barricaded = False
+    def expand(self):
 
+        self.failed_attempts = 0
+                
+        self.visibility = {}
+        for name, value in self.asymmetries.items():
+            self.visibility[name] = value["visibility"]
         if self.conditions == "locked":
             self.is_locked = True
         elif self.conditions == "blocked":
@@ -444,22 +506,80 @@ class Portal():
         elif self.conditions == "barricaded":
             self.is_barricaded = True
 
-        self.is_passable = not (self.is_locked or self.is_locked or self.is_barricaded)
+        self.is_passable = not (self.is_locked or self.is_barricaded or self.is_barricaded)
 
     def inspect(self, room, room_b):
-        
-        extra_dict = prompts.prompt(
-            prompts.portal_inspect(room, room_b, self),
-            MODEL,
-            TEMP
-        )
 
-        self.flavour_text = extra_dict["flavour_text"]
-        self.failed_entry_text = extra_dict["failed_entry_text"]
-        self.entry_text = extra_dict["entry_text"]
-        self.lock_difficulty = extra_dict["lock_difficulty"]
-        self.force_difficulty = extra_dict["force_difficulty"] 
-        self.is_trapped = extra_dict["is_trapped"]
+        try:
+            if self.failed_entry_text is None:
+                pass
+        except:
+            self.failed_entry_text is None
+
+        if self.failed_entry_text is None:
+            
+            extra_dict = prompts.request_response(
+                prompts.portal_inspect(room, room_b, self),
+                MODEL,
+                TEMP
+            )
+
+            self.flavour_text = extra_dict["flavour_text"]
+            self.failed_entry_text = extra_dict["failed_entry_text"]
+            self.entry_text = extra_dict["entry_text"]
+
+            self.is_pickable = extra_dict["is_pickable"]
+            self.not_pickable_text = extra_dict["not_pickable_text"]
+            self.lockpick_results = extra_dict["lockpick_results"]
+            self.lock_broken_results = extra_dict["lock_broken_text"]
+
+            self.force_difficulty = extra_dict["force_difficulty"] 
+            self.is_trapped = extra_dict["is_trapped"]
+
+            self.inspected = True
+        
+            self.containing_dungeon.save()
+
+    def pick(self, player):
+
+        if self.lock_broken:
+            self.broken_attempts += 1
+            try:
+                audio.read_text(self.lock_broken_text[str(self.broken_attempts)])
+            except:
+                audio.read_text(list(sorted(self.lock_broken_text).values())[-1])
+        
+        elif not self.is_pickable:
+            self.pick_attempts += 1
+
+            try:
+                audio.read_text(self.not_pickable_text[str(self.pick_attempts)])
+            except:
+                audio.read_text(list(sorted(self.not_pickable_text).values())[-1])
+
+        else:
+            lockpick_roll = roll20()
+            print(f"You rolled a {lockpick_roll} + {player.lockpick_mod} + {self.lock_damage_mod} lockpick check.")  
+            lockpick_roll += player.lockpick_mod + self.lock_damage_mod
+
+            int_ranges = [int(value) for value in self.lockpick_results]
+            
+            value = find_nearest_lower_np(int_ranges, lockpick_roll)
+
+            audio.read_text(self.lockpick_results[str(value)]["message"])
+
+            if self.lockpick_results[str(value)]["result"] == "success":
+                self.is_locked = False
+                if self.conditions == "locked":
+                    self.conditions = "unobstructed"
+            elif self.lockpick_results[str(value)]["result"] == "damaged":
+                self.lock_damage_mod -= 5
+            elif self.lockpick_results[str(value)]["result"] == "broken":
+                self.lock_damage_mod -= 500
+                self.lock_broken = True
+                self.is_pickable = False
+            elif self.lockpick_results[str(value)]["result"] == "loosened":
+                self.lock_damage_mod += 5
 
 
 def to_snake_case(input_string):
@@ -499,12 +619,7 @@ def load_or_generate_dungeon(
         with dungeon_file_name.open('wb') as handle:
             pickle.dump(dungeon, handle)
 
-    for room in dungeon.rooms.values():
-        room.perception_roll = 0
-        room.explored = False
-        room.discovered_items ={}
-        room.discovered_portals = {}
-
+    dungeon.reset()
     return dungeon
 
 def cli_loop(dungeon, current_room, player):
@@ -542,7 +657,6 @@ def main():
         audio.read_text(f"There are {len(dungeon.entrances)} entrances to the dungeon:\n")
     else:
         audio.read_text(f"There is only one entrance to the dungeon:\n")
-
 
     for index, entrance in enumerate(dungeon.entrances):
         audio.read_text(f"{index}. {entrance}")
