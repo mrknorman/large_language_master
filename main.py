@@ -17,7 +17,7 @@ TEMP = 0.7
 from tqdm import tqdm
 
 # Internal Libraries:
-import prompts
+import prompts_old as prompts
 import commands
 import audio
 
@@ -179,7 +179,7 @@ class Room:
         try:
             audio.read_text(self.flavour[str(self.times_visited)])
         except:
-            audio.read_text(list(sorted(self.flavour).values())[-1])
+            audio.read_text([self.flavour[key] for key in sorted(self.flavour)][-1])
         
         self.times_visited += 1
 
@@ -211,7 +211,7 @@ class Room:
 
         if self.unexplored == True:
 
-            if len(self.discovered_portals) > 1 and entrance is not None:
+            if len(self.discovered_portals) > 1 or entrance is None:
                 audio.read_text("On first entrance you note several exits to the room, including the passage you entered through, these are:")
                 for index, name in enumerate(sorted(self.discovered_portals)):
                     audio.read_text(f"{index}. {name}") 
@@ -377,7 +377,7 @@ class Dungeon:
     def plan(self, name):
 
         return prompts.request_response(
-            prompts.dungeon(name, 15, 20),
+            prompts.dungeon(name, 1, 3),
             MODEL,
             TEMP,
         )
@@ -547,7 +547,7 @@ class Portal():
             try:
                 audio.read_text(self.lock_broken_text[str(self.broken_attempts)])
             except:
-                audio.read_text(list(sorted(self.lock_broken_text).values())[-1])
+                audio.read_text([self.lock_broken_text[key] for key in sorted(self.lock_broken_text)][-1])
         
         elif not self.is_pickable:
             self.pick_attempts += 1
@@ -555,7 +555,7 @@ class Portal():
             try:
                 audio.read_text(self.not_pickable_text[str(self.pick_attempts)])
             except:
-                audio.read_text(list(sorted(self.not_pickable_text).values())[-1])
+                audio.read_text([self.not_pickable_text[key] for key in sorted(self.not_pickable_text)][-1])
 
         else:
             lockpick_roll = roll20()

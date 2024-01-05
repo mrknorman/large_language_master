@@ -1,10 +1,3 @@
-
-
-from openai import OpenAI
-client = OpenAI(api_key=open('./api_key', 'r').read())
-import json
-import random
-
 SYSTEM = \
 f"""
     As an expert dungeon master with extensive experience, your expertise lies in crafting creative, story-driven adventures. Your top priority is to ensure a fun and immersive experience for all players. Your responses will be integrated into a framework, so it is crucial to adhere closely to the prescribed format.
@@ -13,9 +6,9 @@ f"""
 
     IMPORTANT: All responses must be structured to be compatible with Python's json.loads function for seamless conversion into a Python dictionary. This ensures your creative content can be easily incorporated into the gaming framework.
 """
-DUNGEON_ATTRIBUTES = ["name", "purpose", "flavour", "secrets", "story", "effect"]
-DUNGEON_ARGUMENTS = ["name", "num_rooms"]
-DUNGEON = """
+
+DUNGEON_PROMPT_ARGUMENTS = ["name", "num_rooms"]
+DUNGEON_PROMPT = """
     Design a dungeon named {name} for an adventuring party. It will have {num_rooms} rooms, focusing initially on the dungeon's layout and overarching narrative. 
 
     Think about the dungeon's theme, the story it tells, and its impact on the players' journey. Your outline should be detailed enough to ensure consistency and a cohesive story, considering future expansions.
@@ -24,7 +17,7 @@ DUNGEON = """
 
     Your response should be in a JSON format compatible with python's json.loads function, like the example below. Highlight the dungeon's purpose, the information known to players beforehand, any secrets, the underlying story, and its anticipated effect on players.
 
-    Each room in the "rooms" dictionary should include a "has_entrance" field. Set this to true if the room is an entry or exit point of the dungeon. Every dungeon should have at least one room with "has_entrance": true, indicating the main entrance or exit. You can also designate additional or secret entrances and exits in the same way.
+    Each room in the "rooms" dictionary should include a "external_connection" field. Set this to true if the room is an entry or exit point of the dungeon. Every dungeon should have at least one room with "external_connection": true, indicating the main entrance or exit. You can also designate additional or secret entrances and exits in the same way.
 
     Example Format:
     {{
@@ -33,33 +26,38 @@ DUNGEON = """
         "secrets": "example secrets",
         "story": "example story",
         "effect": "example effect",
-        "rooms": {{
+        "rooms_outline": {{ # A plan of the rooms contained by this dungeon and the player-traversable connections between them.
             "Room 1 Name": {{
-                "connected_to": ["Room 2 Name", "Room 3 Name"],
-                "has_entrance": true
+                "connected_to": ["Room 2 Name", ...], # A list of rooms which connect to this one.
+                "external_connection": true,
+                "description" : "description of the room"
             }},
             ...
         }}
     }}
 """
 
-ROOM_ATTRIBUTES = ["name", "purpose", "flavour", "secrets", "story", "effect"]
-ROOM_ARGUMENTS = ["name", "num_rooms"]
-ROOM = """
-    Design a new room, {room_name}, for your dungeon. This room is part of a larger dungeon with the following characteristics:
+ROOM_PROMPT_ARGUMENTS = ["name", "lineage", "connected_verticies"]
+ROOM_PROMPT = """
+    Design a new room, {name}, for your dungeon. This room is part of a larger dungeon.
 
-    {header}
+    Here is some contextual infomation about the dungeon:
+
+    {lineage}
 
     Initially, players will encounter only the room's name and flavour text. Use the other details to guide the room's design, ensuring consistency with the dungeon's overall story and theme.
 
-    Traversable Entrances/Exits: {room_portals}
+    Traversable Entrances/Exits: 
+    
+    {connected_verticies}
+
     Align the room's description, investigation, and perception details with these entrances/exits for a cohesive player experience. The visibility of traversal points should match the difficulty of perceiving them. If a traversal point is less visible, it should not be easily detected in the room's flavour text.
 
     Format your response as a JSON-like string for Python's json.loads function:
     {{
         "purpose": "In-universe purpose",
         "flavour": {{
-            "0": "First impression description",
+            "0": "First impression description. This should be the longest and reveal everything noticable on first entry to the room.",
             "1": "Second entry description",
             ... # Additional entries as desired
         }},
@@ -73,7 +71,7 @@ ROOM = """
         }},
         "perception_text": {{
             "0": "Basic perception information",
-            "roll_required (out of 30)": "Information for a specific perception roll",
+            "roll_required (out of 30)": "Information for a specific wisdom roll",
             ... # Additional information as needed
         }}
     }}
@@ -122,18 +120,18 @@ ROOM_ITEMS = """
     Note: visibility can take any value between 1 and 30, not just these examples.
 """
 
-DUNGEON_PORTALS_ARGUMENTS = ["header", "portals"]
+DUNGEON_PORTALS_PROMPT_ARGUMENTS = ["context", "portals_map"]
 DUNGEON_PORTALS = \
 """
     As you design a dungeon for your adventuring party, focus on creating traversal points between rooms. These can be doors, tunnels, ladders, staircases, or other connectors. Mix mundane and extraordinary elements to keep the dungeon both grounded and exciting.
 
     Here is some contextual infomation about the dungeon:
 
-    {header}
+    {context}
 
     And here is a list of connected pairs of rooms, each of which require a traversal point:
 
-    {portals}
+    {portals_map}
 
     For each traversal point, devise a descriptive name and a detailed description for consistency. Note any asymmetries where the experience of traversing differs based on direction.
 
@@ -163,7 +161,8 @@ DUNGEON_PORTALS = \
     Note: Choose any value between 1 and 30 for visibility, not limited to these examples.
 """
 
-PORTAL_INSPECT = """
+PORTAL_ARGUMENTS = [""]
+PORTAL = """
         You are designing an traversal-point between two areas of your dungeon.
         traversal-points include anything that a party member can use to transit between different 
         rooms in the dungeon. These could be doors, trapdoors, ladders, simple cracks in the wall,

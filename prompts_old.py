@@ -15,32 +15,38 @@ f"""
 """
 
 DUNGEON = """
-    Design a dungeon named {name} for an adventuring party. It will have {num_rooms} rooms, focusing initially on the dungeon's layout and overarching narrative. 
+    You are designing a dungeon called {name} for your adventuring party to explore.
+    It should have {num_rooms} rooms.
 
-    Think about the dungeon's theme, the story it tells, and its impact on the players' journey. Your outline should be detailed enough to ensure consistency and a cohesive story, considering future expansions.
+    The details of the rooms will be filled out by you later on, for now focus on the overall plan of 
+    the dungeon, the story you'd like it to tell, and how it will affect the player's journey. Ensure that
+    there is enough information in the plan for another instance of you to create a more detailed story
+    when prompted for specific information. Ensure there is enough detail to avoid incosistencies and to tell 
+    a cohesive story, even if your future self is not presnted with infomation about the other rooms.
 
-    Ensure logical room connections, with each room having at least one entrance or exit. Include transitional spaces like corridors, particularly in larger dungeons, which can lead to multiple rooms and contain elements of interest.
+    IMPORTANT: Make sure the room connections make sense. This means insure that all rooms have an entrance, 
+    and that rooms that connect are listed in both the connecting rooms.
 
-    Your response should be in a JSON format compatible with python's json.loads function, like the example below. Highlight the dungeon's purpose, the information known to players beforehand, any secrets, the underlying story, and its anticipated effect on players.
+    NOTE: Rooms can and often should include transition spaces such as corridors, especially in larger dungeons.
+    These transition rooms will lead to multiple other rooms but can themselves contain interesting things.
 
-    Each room in the "rooms" dictionary should include a "has_entrance" field. Set this to true if the room is an entry or exit point of the dungeon. Every dungeon should have at least one room with "has_entrance": true, indicating the main entrance or exit. You can also designate additional or secret entrances and exits in the same way.
-
-    Example Format:
+    Respond with an outline in the following JSON format that can be converted into a python dictionary with python's json.loads function:
     {{
-        "purpose": "example purpose",
-        "flavour": "example flavour",
-        "secrets": "example secrets",
-        "story": "example story",
-        "effect": "example effect",
-        "rooms": {{
-            "Room 1 Name": {{
-                "connected_to": ["Room 2 Name", "Room 3 Name"],
-                "has_entrance": true
+        "purpose" : str, # the in universe purpose of the dungeon
+        "flavour" : str, # A description of the dungeon containing only information that your players would know before entering
+        "secrets" : str, # any secrets the dungeon may hold
+        "story" : str, # the underlying story you want the dungeon to tell
+        "effect" : str, # the effect you imagine this room will have on the player's stories
+        "rooms" : dict {{ # A plan of the rooms contained by this dungeon and the player-traversable connections between them
+            "Room 1 Name" : dict
+            {{
+                "connected_to" : List[str], # list of rooms which connect to this one
+                "has_entrance" : bool, # true if room has dungon entrance/exit (should be at least one per dungeon, but there can be alternative and secret entrances/exits)
             }},
-            ...
+        ...
         }}
     }}
-"""
+    """
 
 ROOM = """
     You are designing a new room for your adventuring party to explore.
@@ -141,36 +147,55 @@ ROOM_ITEMS = """
 """
 
 PLAN_PORTAL = \
-"""
-    As you design a dungeon for your adventuring party, focus on creating traversal points between rooms. These can be doors, tunnels, ladders, staircases, or other connectors. Mix mundane and extraordinary elements to keep the dungeon both grounded and exciting.
+    """
+        You are designing a dungeon for your adventuring party to explore.
+        Here is a description of the dungeon:
 
-    For each traversal point, devise a descriptive name and a detailed description for consistency. Note any asymmetries where the experience of traversing differs based on direction.
+        Name:{dungeon_name}
+        Purpose:{dungeon_purpose}
+        Flavour:{dungeon_flavour}
+        Secrets:{dungeon_secrets}
+        Story:{dungeon_story}
+        Effect:{dungeon_effect}
 
-    Use the provided list of connected pairs {portal_pairs} to structure your response. Format your response as a JSON string compatible with Python's json.loads function, with the following structure:
-    {{
-        "descriptive_traversal_point_name": {{
-            "description": "Aesthetic and functional details",
-            "hit_points": "Door health, with 10 as average for a wooden door",
-            "asymmetries": {{
-                "room_1_name": {{
-                    "description": "Details from this room's perspective",
-                    "visibility": "Visibility level (1-30)"
-                }},
-                "room_2_name": {{
-                    "description": "Details from the other room's perspective",
-                    "visibility": "Visibility level (1-30)"
-                }}
-            }},
-            "conditions": "State of the traversal point (unobstructed, locked, blocked, barricaded)"
-        }},
-        ...
-    }}
+        I have generated a list of the traversal-points between rooms present in this dungeon, these
+        connections can be doors, tunnels, ladders, staircases or any other kind of connections. 
+        traversal-points include anything that a party member can use to transit between different 
+        rooms in the dungeon. Be creative but include sometime be mundane so the impressive travesal 
+        points are more exciting to find.
 
-    Visibility Scale: 
-    1 - Impossible to miss, 5 - Very easy to see, 10 - Easy to see, 15 - Could easily be overlooked,
-    20 - Hard to see, 25 - Very hard to see, 30 - Almost impossible to see.
-    Note: Choose any value between 1 and 30 for visibility, not limited to these examples.
-"""
+        I would like you to come up with a desciptive name for each of these traversal-points and
+        a brief description for you to use later when describing the traversal-point, 
+        to ensure that the description is consistent from both directions. If the traversal-point is
+        particularly asymetric, make a note of that in the asymmetries feild.
+
+        Here is the list of connected pairs {portal_pairs}.
+
+        Respond in a JSON string that can be read by python's json.loads function. In the same order as the traversal-point pairs appear:
+        {{
+            "descriptive_traveral_point_name":
+            {{
+                "description: str, # aesthetic notes
+                "hit_points:" int, #door health where 10 is an average wooden door
+                "asymmetries" : dict, # ALWAYS create both entry even if the door is symmetric.
+                {{
+                    "room_1_name" : str {{
+                        "description" : str, # description of this rooms side of the traversal-point, empty if symetric
+                        "visibility" : int #visibility of this room's side of the traversal-point, see below,
+                    }} : dict,
+                    "room_2_name" : str {{
+                        # as with first room name
+                    }} : dict,
+                }} # Note: traversal points should connect two rooms only
+                "conditions" : str # one of [unobstructed, locked, blocked, or barricaded] and no more            
+            }}
+        }}
+
+        Given that visibility is measured out of 30 where:
+        1: Impossible to miss, 5: Very easy to see, 10: Easy to see, 15: Could easily be overlooked,
+        20: Hard to see, 25: Very hard to see, 30: Almost impossible to see.
+        Note: visibility can take any value between 1 and 30, not just these examples.
+    """   
 
 PORTAL_INSPECT = """
         You are designing an traversal-point between two areas of your dungeon.
