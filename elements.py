@@ -1,5 +1,6 @@
 import logging
 import json
+import re
 
 from enum import Enum
 from dataclasses import dataclass
@@ -10,6 +11,22 @@ from time import sleep
 from openai import OpenAI
 
 import prompts
+
+def ensure_directory_exists(
+		directory: Path
+	):
+
+	if not isinstance(directory, Path):
+		raise ValueError("directory is not Path")  
+	elif not directory.exists():
+	    directory.mkdir(parents=True, exist_ok=True)
+
+def to_snake_case(input_string : str):
+    # Replace non-alphanumeric characters with an underscore
+    s = re.sub(r'\W+', '_', input_string)
+
+    # Convert to lowercase
+    return s.lower()
 
 class Verbs():
 	pass
@@ -256,7 +273,11 @@ class Element():
 
 		self.initilized = False
 
-	def save(self, force_overwrite=False):
+	def save(
+			self, 
+			additional_attributes : dict = None, 
+			force_overwrite : bool = False,
+		):
 
 		save_attributes = {
 			"name" : self.name,
@@ -268,28 +289,49 @@ class Element():
 		}
 		save_attributes.update(self.outline)
 
+		if self.additional_attibutes is not None:
+			save_attributes.update(self.aditional_attributes)
+
 		# Convert save_attributes to JSON
 		save_json = json.dumps(save_attributes, indent=4)
 
+		# Setup file name:
+		ensure_directory_exists(self.path)
+		snake_name = to_snake_case(self.name)
+
 		# Write to file
-		with open(self.path, 'w') as file:
+		with open(self.path / snake_name, 'w') as file:
 			file.write(save_json)
 
-	@classmethod
 	def load(self):
-	
+
+		if not isinstance(self.path, Path):
+			raise ValueError("self.path is not Path")
+		elif not self.path.exists():
+			raise FileExistsError("self.path does not exist!")
+
 		with open(self.path, 'r') as file:
 			data = json.load(file)
 
 		for key, value in data.items():
 			setattr(self, key, value)
 
-	def initilize(self):
-		self.generate_primary_outline()
-		self.encorporate_outline()
-		self.create_summary()
+	def initilize(
+			self, 
+			force_reinit : bool = False
+		):
 
-		self.context = self.lineage + self.summary
+		if force_reinit is not True and self.path.exists():
+			self.load()
+		else:
+			self.generate_primary_outline()
+			self.encorporate_outline()
+			self.create_summary()
+
+			self.context = self.lineage + self.summary
+
+			self.save()
+		
 		self.initilized = True
 
 	def generate_primary_outline(self):
@@ -377,13 +419,31 @@ class ElementNetwork(Element):
 			siblings=siblings,
 		)
 
-	def initilize(self):
-		super().initilize()
-		self.generate_vertices()
-		self.verticies_prompt_arguments = {
-			key : getattr(self, key) for key in self.verticies_prompt_arguments
+	def save(
+			self, 
+			additional_attributes : dict = None
+		):
+
+		additional_attributes = {
+			"verticies_outline" : self.verticies_outline,
 		}
-		self.generate_vertices_outline()
+		super().save(additional_attributes=additional_attributes)
+
+
+	def initilize(self, force_reinit : bool = False):
+		super().initilize(
+			force_reinit=force_reinit,
+		)
+
+		if force_reinit is not True and self.path.exists():
+			self.generate_vertices()
+			self.verticies_prompt_arguments = {
+				key : getattr(self, key) for key in self.verticies_prompt_arguments
+			}
+			self.generate_vertices_outline()
+			self.save()
+
+		self.encorporate_vertex_outline()
 
 	def ensure_connections(self):  
 		network_dict = getattr(self, f"{self.node_key}_outline")
@@ -416,10 +476,13 @@ class ElementNetwork(Element):
 			template=self.verticies_prompt_template,
 			api_config=self.api_config
 		)
+		self.verticies_outline = self.verticies_prompt.response
+
+	def encorporate_vertex_outline(self):
 		setattr(
 			self, 
 			f"{self.vertex_key}_outline", 
-			self.verticies_prompt.response
+			self.verticies_outline
 		)
 	
 class ElementNode(Element):
@@ -459,6 +522,7 @@ class ElementNode(Element):
 
 		self.vertex_key = self.type.vertex_key
 		self.connected_to = connected_to 
+
 class ElementVertex(Element):
 
 	def __init__(
@@ -613,4 +677,3 @@ if __name__ == "__main__":
 	)
 	dungeon.initilize()
 	dungeon.intiilize_children()
-	dungeon.save()
