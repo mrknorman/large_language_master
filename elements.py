@@ -180,8 +180,11 @@ class ElementType():
 	prompt_arguments : List[str]
 	prompt_template : str
 	child_element_dict : dict = None
+	affordances : List = None
 
 	def __post_init__(self):
+		if self.affordances is None:
+			self.affordances = []
 		if not isinstance(self.name, str):
 			raise ValueError("name is not string!")
 		elif not isinstance(self.summary_attributes, list):
@@ -240,7 +243,6 @@ class Element():
 			api_config : APIConfig,
 			description : str = None, 
 			path : Path = None, 
-			verbs : List = None,
 			parent : Self = None,
 			siblings : List[Self] = None
 		):
@@ -253,7 +255,7 @@ class Element():
 
 		self.api_config = api_config
 
-		self.verbs = verbs
+		self.affordances = self.type.affordances
 
 		self.parent = parent
 		if self.parent is not None:
@@ -279,6 +281,18 @@ class Element():
 		self.envisioned = False
 
 		self.generate_path(path)
+		self.initlize_affordances()
+
+	def initlize_affordances(self):
+		affordance_dict = {}
+		for affordance in self.affordances:
+			affordance_object = affordance(
+				is_possible=True,
+				parent=self
+			)
+			affordance_dict[affordance_object.name] = affordance_object
+
+		self.affordances = affordance_dict
 
 	def generate_path(self, path : Path):
 		if path is not None:

@@ -10,6 +10,11 @@ from dungeon_prompts import SYSTEM
 from player import Player
 from stats import AbilityScores, Check
 
+from audio import read
+from verbs import Enter
+
+
+
 if __name__ == "__main__":
 
     MODEL = "gpt-4-1106-preview"
@@ -48,6 +53,10 @@ if __name__ == "__main__":
         ),
         api_config=api_config
     )
+
+    enter = Enter()
+
+    enter(player, dungeon)
 
     player.roll(Check('strength', 'ability'))
     
