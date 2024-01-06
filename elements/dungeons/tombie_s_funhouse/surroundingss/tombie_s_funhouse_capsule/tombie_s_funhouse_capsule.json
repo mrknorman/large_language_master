@@ -1,0 +1,48 @@
+{
+    "name": "The Crooked Carnival",
+    "description": null,
+    "parent_name": "Tombie's Funhouse",
+    "lineage": " - name: Tombie's Funhouse\n - purpose: Tombie's Funhouse is designed to challenge the party's perception of reality and test their problem-solving skills in an environment where the whimsical and the dangerous intersect.\n - flavour: The funhouse is an unpredictable labyrinth created by the eccentric wizard Tombie, who delights in the absurd. It's filled with bright colors, distorted mirrors, and bizarre contraptions that seem to defy the laws of physics.\n - secrets: Hidden mechanisms and illusions mask the true nature of the dungeon, with secret passages that can lead to Tombie's private chambers or to hidden treasures.\n - story: Long ago, Tombie was a celebrated mage, known for his extravagant parties. But as his magic delved into realms unknown, his mind became a twisted mirror of his funhouse. Now, he lures adventurers in, promising them glory and riches, if they can survive his twisted games.\n - effect: Players will experience a sense of wonder mixed with trepidation as they navigate the funhouse's deceptive appearances. The environment should encourage exploration but also instill caution, as not everything is as it seems.\n",
+    "summary": " - name: The Crooked Carnival\n - flavour: The area surrounding Tombie's Funhouse is an abandoned carnival ground. Once a place of joy and laughter, it now sits in eerie silence. Faded colorful tents flap in the wind, and carnival games, now broken and rusted, litter the area. There's an unnerving sense of being watched as the adventurers approach the funhouse, its twisted spire towering above the dilapidated attractions. The faint sound of calliope music occasionally drifts through the air, though its source is unseen.\n - secrets: Beneath the carnival grounds lies a network of hidden tunnels, used by Tombie to move unseen and change the layout of his funhouse in real time.\n - story: The carnival was once the heart of Tombie's social life, a place where he entertained guests with magical wonders. It now serves as the foreboding threshold to his madness, a remnant of happier times.\n - effect: The players will feel a mix of nostalgia for a bygone festive time and an unsettling anticipation of the madcap dangers that lie ahead.\n",
+    "context": " - name: Tombie's Funhouse\n - purpose: Tombie's Funhouse is designed to challenge the party's perception of reality and test their problem-solving skills in an environment where the whimsical and the dangerous intersect.\n - flavour: The funhouse is an unpredictable labyrinth created by the eccentric wizard Tombie, who delights in the absurd. It's filled with bright colors, distorted mirrors, and bizarre contraptions that seem to defy the laws of physics.\n - secrets: Hidden mechanisms and illusions mask the true nature of the dungeon, with secret passages that can lead to Tombie's private chambers or to hidden treasures.\n - story: Long ago, Tombie was a celebrated mage, known for his extravagant parties. But as his magic delved into realms unknown, his mind became a twisted mirror of his funhouse. Now, he lures adventurers in, promising them glory and riches, if they can survive his twisted games.\n - effect: Players will experience a sense of wonder mixed with trepidation as they navigate the funhouse's deceptive appearances. The environment should encourage exploration but also instill caution, as not everything is as it seems.\n - name: The Crooked Carnival\n - flavour: The area surrounding Tombie's Funhouse is an abandoned carnival ground. Once a place of joy and laughter, it now sits in eerie silence. Faded colorful tents flap in the wind, and carnival games, now broken and rusted, litter the area. There's an unnerving sense of being watched as the adventurers approach the funhouse, its twisted spire towering above the dilapidated attractions. The faint sound of calliope music occasionally drifts through the air, though its source is unseen.\n - secrets: Beneath the carnival grounds lies a network of hidden tunnels, used by Tombie to move unseen and change the layout of his funhouse in real time.\n - story: The carnival was once the heart of Tombie's social life, a place where he entertained guests with magical wonders. It now serves as the foreboding threshold to his madness, a remnant of happier times.\n - effect: The players will feel a mix of nostalgia for a bygone festive time and an unsettling anticipation of the madcap dangers that lie ahead.\n",
+    "outline": {
+        "name": "The Crooked Carnival",
+        "flavour": "The area surrounding Tombie's Funhouse is an abandoned carnival ground. Once a place of joy and laughter, it now sits in eerie silence. Faded colorful tents flap in the wind, and carnival games, now broken and rusted, litter the area. There's an unnerving sense of being watched as the adventurers approach the funhouse, its twisted spire towering above the dilapidated attractions. The faint sound of calliope music occasionally drifts through the air, though its source is unseen.",
+        "success_exit_text": "As the adventurers emerge, triumphant, the carnival grounds seem less ominous, bathed in the warm glow of sunset. The once foreboding silence now feels like peaceful solitude, a quiet victory over the chaos of the funhouse.",
+        "failed_exit_text": "The carnival grounds are cold and unwelcoming as the defeated adventurers retreat. The laughs and cheers of ghostly patrons from a bygone era echo mockingly, and the shadows stretch out as if to pull the party back into Tombie's twisted world.",
+        "early_exit_text": [
+            "Upon leaving the funhouse prematurely, the carnival's whimsical decay seems to mock the party's lack of progress, with every creak and groan of the old structures a derisive sneer.",
+            "If the party exits early again, the carnival takes on an oppressive atmosphere, as if the very air is heavy with the weight of their unfulfilled quest."
+        ],
+        "secrets": "Beneath the carnival grounds lies a network of hidden tunnels, used by Tombie to move unseen and change the layout of his funhouse in real time.",
+        "story": "The carnival was once the heart of Tombie's social life, a place where he entertained guests with magical wonders. It now serves as the foreboding threshold to his madness, a remnant of happier times.",
+        "effect": "The players will feel a mix of nostalgia for a bygone festive time and an unsettling anticipation of the madcap dangers that lie ahead.",
+        "investigation_text": {
+            "0": "The carnival seems long abandoned, but traces of magic linger in the air, suggesting that this place may still hold life, or something like it.",
+            "15": "A thorough search reveals faded footprints leading toward the funhouse and the occasional sparkle of residual enchantment on some of the carnival games.",
+            "25": "In a hidden compartment of an old ticket booth, adventurers find a diary belonging to a former carnival worker, hinting at Tombie's descent into madness."
+        },
+        "perception_text": {
+            "0": "The adventurers notice the uncanny stillness of the place, with only the sounds of their own footsteps for company.",
+            "18": "A sharp-eared party member hears the faint sound of gears and clockwork beneath the ground, hinting at mechanisms below.",
+            "28": "Amidst the decrepit carnival attractions, a keen observer spots a patch of ground that doesn't match the rest, suggesting a concealed entrance to the tunnels below."
+        },
+        "entrances": {
+            "The Giggling Gate": {
+                "description": "The main entrance to Tombie's Funhouse is a giant clown's mouth, its paint chipped and faded, yet the hinge of its jaw creaks open as if inviting the adventurers inside.",
+                "hit_points": "20",
+                "asymmetries": {
+                    "The Crooked Carnival": {
+                        "description": "From the outside, the clown's mouth appears almost welcoming, a twisted grin amidst the carnival's decay.",
+                        "visibility": "5"
+                    },
+                    "The Hall of Laughter": {
+                        "description": "On the inside, the gate closes with an ominous thud, the sound of laughter echoing behind it.",
+                        "visibility": "10"
+                    }
+                },
+                "conditions": "unobstructed"
+            }
+        }
+    }
+}

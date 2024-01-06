@@ -2,15 +2,14 @@ import logging
 import json
 import re
 
-from enum import Enum
 from dataclasses import dataclass
 from typing import List, Tuple, Self
 from pathlib import Path
-from time import sleep
 
+from tqdm import tqdm
 from openai import OpenAI
 
-import prompts
+import dungeon_prompts
 
 def ensure_directory_exists(
 		directory: Path
@@ -65,7 +64,7 @@ class ElementPrompt:
 			max_num_prompt_retries : int = 10
 		) -> None:
 
-		self.logger = logging.getLogger(__name__)
+		self.logger = getLogger(__name__)
 
 		self.arguments = arguments
 		self.template = template
@@ -196,6 +195,7 @@ class NetworkElementType(ElementType):
 	vertex_key : str = None
 	verticies_prompt_arguments : List[str] = None
 	verticies_prompt_template : str = None
+	capsule : str = None
 
 	def __post_init__(self):
 		super().__post_init__()
@@ -212,10 +212,14 @@ class NetworkElementType(ElementType):
 @dataclass
 class VertexElementType(ElementType):
 	node_key : str = None
-
 @dataclass
 class NodeElementType(ElementType):
 	vertex_key : str = None
+
+@dataclass
+class CapsuleType(ElementType):
+	vertex_key : str = None
+	node_key : str = None
 
 class Element():
 
@@ -242,7 +246,8 @@ class Element():
 		):
 
 		self.name = name
-		self.path = path
+		self.snake_name = to_snake_case(name)
+
 		self.description = description
 		self.type = type
 
@@ -270,8 +275,26 @@ class Element():
 		self.prompt_template = self.type.prompt_template
 
 		self.child_element_dict = self.type.child_element_dict
+		
+		self.envisioned = False
 
-		self.initilized = False
+		self.generate_path(path)
+
+	def generate_path(self, path : Path):
+		if path is not None:
+			self.path = path / f"{self.type.name}s"  / self.snake_name / f"{self.snake_name}.json"
+		elif self.parent is not None:
+			self.path = self.parent.path.parent / f"{self.type.name}s"  / self.snake_name / f"{self.snake_name}.json"
+
+	def assemble(self):
+		self.envision()
+		self.save()
+		if len(self.children):
+			self.assemble_children()
+
+	def assemble_children(self):
+		self.initilize_children()
+		self.envision_children()
 
 	def save(
 			self, 
@@ -282,25 +305,24 @@ class Element():
 		save_attributes = {
 			"name" : self.name,
 			"description" : self.description,
-			"parent_name" : self.parent,
+			"parent_name" : self.parent_name,
 			"lineage" : self.lineage,
 			"summary" : self.summary,
 			"context" : self.context
 		}
-		save_attributes.update(self.outline)
+		save_attributes.update({"outline" : self.outline})
 
-		if self.additional_attibutes is not None:
-			save_attributes.update(self.aditional_attributes)
+		if additional_attributes is not None:
+			save_attributes.update(additional_attributes)
 
 		# Convert save_attributes to JSON
 		save_json = json.dumps(save_attributes, indent=4)
 
 		# Setup file name:
-		ensure_directory_exists(self.path)
-		snake_name = to_snake_case(self.name)
+		ensure_directory_exists(self.path.parent)
 
 		# Write to file
-		with open(self.path / snake_name, 'w') as file:
+		with open(self.path, 'w') as file:
 			file.write(save_json)
 
 	def load(self):
@@ -316,7 +338,7 @@ class Element():
 		for key, value in data.items():
 			setattr(self, key, value)
 
-	def initilize(
+	def envision(
 			self, 
 			force_reinit : bool = False
 		):
@@ -325,14 +347,12 @@ class Element():
 			self.load()
 		else:
 			self.generate_primary_outline()
-			self.encorporate_outline()
-			self.create_summary()
 
-			self.context = self.lineage + self.summary
+		self.encorporate_outline()
+		self.envision_summary()
+		self.context = self.lineage + self.summary
 
-			self.save()
-		
-		self.initilized = True
+		self.envisioned = True
 
 	def generate_primary_outline(self):
 		self.prompt = ElementPrompt(
@@ -346,7 +366,7 @@ class Element():
 		for key, value in self.outline.items():
 			setattr(self, key, value)
 
-	def create_summary(self):
+	def envision_summary(self):
 		extracted_attibute_values= {
 			attr: getattr(self, attr) for attr in self.summary_attributes if hasattr(self, attr)}
 		
@@ -354,7 +374,7 @@ class Element():
 		for attr, value in extracted_attibute_values.items():
 			self.summary += f' - {attr}: {value}\n'
 
-	def intiilize_children(self):
+	def initilize_children(self):
 		
 		for key, value in self.child_element_dict.items():
 
@@ -376,35 +396,33 @@ class Element():
 				key, 
 				child_type_dict
 			)
-class PromptBuilder:
-	
-	def __init__(
-			self,
-			header,
-			parent_context: List[Element],
-			sibling_context : List[Element],
-			child_contex: List[Element],
-			base :  str
-		):
-			self.header = header
-			return self.header
 
-class ElementNetwork(Element):
+	def envision_children(self):
+
+		for child in self.children.values():
+			child_type_name = child.type.name
+			break
+
+		for child in tqdm(
+				self.children.values(),
+				desc=f"The DM is envisioning {child_type_name}s for {self.name}..."
+			):
+		
+			child.assemble()
+
+class Network(Element):
 
 	def __init__(
 			self,
 			name : str,
 			type : ElementType,
 			api_config : APIConfig, 
-			description : str = None, 
-			path : Path = None, 
-			verbs : List = None, 
-			parent : Element = None,
-			siblings : List[Element] = None
+			**kwargs
 		):
 
 		self.node_key = type.node_key
 		self.vertex_key = type.vertex_key
+		self.capsule = type.capsule
 		self.verticies_prompt_arguments = type.verticies_prompt_arguments
 		self.verticies_prompt_template = type.verticies_prompt_template
 
@@ -412,11 +430,7 @@ class ElementNetwork(Element):
 			name=name, 
 			type=type,
 			api_config=api_config,
-			description=description,
-			path=path,
-			verbs=verbs,
-			parent=parent,
-			siblings=siblings,
+			**kwargs
 		)
 
 	def save(
@@ -429,23 +443,35 @@ class ElementNetwork(Element):
 		}
 		super().save(additional_attributes=additional_attributes)
 
-
-	def initilize(self, force_reinit : bool = False):
-		super().initilize(
+	def envision(self, force_reinit : bool = False):
+		super().envision(
 			force_reinit=force_reinit,
 		)
 
 		if force_reinit is not True and self.path.exists():
+			self.load()
+		else:
 			self.generate_vertices()
 			self.verticies_prompt_arguments = {
 				key : getattr(self, key) for key in self.verticies_prompt_arguments
 			}
-			self.generate_vertices_outline()
-			self.save()
+			self.envision_vertices_outline()
+
+		if self.capsule is not None:
+			self.capsule = self.capsule(
+				name=f"{self.name}_capsule",
+				api_config=self.api_config,
+				parent=self
+			)
+
+			self.capsule.assemble()
+			self.children[self.capsule.type.name] = self.capsule
+			self.entrances = self.capsule.entrances
+			self.verticies_outline.update(self.entrances)
 
 		self.encorporate_vertex_outline()
 
-	def ensure_connections(self):  
+	def ensure_vertex_validity(self):  
 		network_dict = getattr(self, f"{self.node_key}_outline")
 
 		for key, value in network_dict.items():
@@ -467,10 +493,10 @@ class ElementNetwork(Element):
 		setattr(self, f"{self.vertex_key}_map", verticies)
 	
 	def generate_vertices(self):
-		self.ensure_connections()
+		self.ensure_vertex_validity()
 		self.get_all_verticies()
 
-	def generate_vertices_outline(self):
+	def envision_vertices_outline(self):
 		self.verticies_prompt = ElementPrompt(
 			arguments=self.verticies_prompt_arguments,
 			template=self.verticies_prompt_template,
@@ -485,7 +511,7 @@ class ElementNetwork(Element):
 			self.verticies_outline
 		)
 	
-class ElementNode(Element):
+class Node(Element):
 
 	def __init__(
 			self,
@@ -494,9 +520,8 @@ class ElementNode(Element):
 			connected_to : Tuple[str],
 			external_connection : bool,
 			api_config : APIConfig, 
-			description : str = None,
-			verbs : List = None, 
-			parent : Element =None,
+			parent : Element = None,
+			**kwargs
 		):
 
 		if parent is not None:
@@ -515,15 +540,47 @@ class ElementNode(Element):
 			name=name, 
 			type=type,
 			api_config=api_config,
-			description=description,
-			verbs=verbs,
-			parent=parent
+			parent=parent,
+			**kwargs
 		)
 
 		self.vertex_key = self.type.vertex_key
 		self.connected_to = connected_to 
 
-class ElementVertex(Element):
+class Capsule(Element):
+
+	def __init__(
+			self,
+			name : str,
+			type : ElementType,
+			parent : Element,
+			api_config : APIConfig, 
+			**kwargs
+		):
+		
+		self.vertex_key = type.vertex_key
+		self.node_key = type.node_key
+		self.parent = parent
+		self.get_all_verticies()
+		
+		super().__init__(
+			name=name, 
+			type=type,
+			parent=parent,
+			api_config=api_config,
+			**kwargs
+		)
+	
+	def get_all_verticies(self):
+		"""Returns a set containing all nodes connected to exterior."""
+		network_dict = getattr(self.parent, f"{self.node_key}_outline")
+
+		self.connected_to = []
+		for key, node in network_dict.items():
+			if node["external_connection"]:
+				self.connected_to.append(key)
+
+class Vertex(Element):
 
 	def __init__(
 			self,
@@ -531,149 +588,15 @@ class ElementVertex(Element):
 			type : ElementType,
 			connected_to : Tuple[str],
 			api_config : APIConfig, 
-			description : None,
-			verbs : List = None, 
-			parent : Element =None,
+			**kwargs
 		):
 		
 		super().__init__(
 			name=name, 
 			type=type,
 			api_config=api_config,
-			description=description,
-			verbs=verbs,
-			parent=parent
+			**kwargs
 		)
 
 		self.node_key = self.type.node_key
-		self.connected_to = connected_to 
-
-DUNGEON_PORTAL = ElementType(
-	name = "portal",
-	summary_attributes=["name", "purpose", "flavour", "secrets", "story", "effect"],
-	prompt_arguments=prompts.ROOM_PROMPT_ARGUMENTS,
-	prompt_template=prompts.ROOM_PROMPT
-)
-
-class Portal(ElementVertex):
-
-	def __init__(
-			self,
-			name : str,
-			room_connections : Tuple[str],
-			api_config : APIConfig, 
-			description : str = None,
-			verbs : List = None, 
-			parent : List =None,
-		):
-
-		super().__init__(
-			name=name, 
-			type=DUNGEON_PORTAL,
-			room_connections=room_connections,
-			api_config=api_config,
-			description=description,
-			verbs=verbs,
-			parent=parent
-		)
-
-ROOM = NodeElementType(
-	name = "room",
-	summary_attributes=["name", "purpose", "flavour", "secrets", "story", "effect"],
-	prompt_arguments=prompts.ROOM_PROMPT_ARGUMENTS,
-	prompt_template=prompts.ROOM_PROMPT,
-	vertex_key="portals"
-)
-class Room(ElementNode):
-
-	def __init__(
-			self,
-			name : str,
-			connected_to : List[str],
-			external_connection : bool, 
-			api_config : APIConfig, 
-			description : str = None,
-			verbs : List = None, 
-			parent : Element=None,
-		):
-
-		super().__init__(
-			name=name, 
-			connected_to=connected_to,
-			external_connection=external_connection,
-			type=ROOM,
-			api_config=api_config,
-			description=description,
-			verbs=verbs,
-			parent=parent
-		)
-
-DUNGEON = NetworkElementType(
-		name="dungeon", 
-		summary_attributes=["name", "purpose", "flavour", "secrets", "story", "effect"],
-		prompt_arguments=prompts.DUNGEON_PROMPT_ARGUMENTS,
-		prompt_template=prompts.DUNGEON_PROMPT,
-		child_element_dict = {
-			"rooms" : Room
-		},
-		node_key="rooms",
-		vertex_key="portals",
-		verticies_prompt_arguments=prompts.DUNGEON_PORTALS_PROMPT_ARGUMENTS,
-		verticies_prompt_template=prompts.DUNGEON_PORTALS
-	)
-class Dungeon(ElementNetwork):
-
-	def __init__(
-			self,
-			name : str,
-			num_rooms : int,
-			api_config : APIConfig, 
-			description : str = None,
-			path : Path = None, 
-			verbs : List = None, 
-			parent : Element=None,
-		):
-
-		self.num_rooms = num_rooms
-
-		super().__init__(
-			name=name, 
-			type=DUNGEON,
-			api_config=api_config,
-			description=description,
-			path=path,
-			verbs=verbs,
-			parent=parent
-		)
-
-class ElementTypes(Enum):
-	DUNGEON_PORTAL = Portal
-	ROOM = Room 
-	DUNGEON = Dungeon
-
-if __name__ == "__main__":
-
-	MODEL = "gpt-4-1106-preview"
-	TEMPERATURE = 0.7
-
-	client = OpenAI(api_key=open('./api_key', 'r').read())
-	dungeon_arguments = {
-		"name" : "Tombie's Funhouse",
-		"num_rooms" : 3
-	}
-
-	api_config = APIConfig(
-		system_prompt=prompts.SYSTEM,
-		model=MODEL,
-		temperature=TEMPERATURE,
-		client=client,
-	)
-	
-	dungeon = Dungeon(
-		name="Tombie's Funhouse",
-		num_rooms=3,
-		api_config=api_config,
-		path=Path("./dungeons/test.json")
-	)
-	dungeon.initilize()
-	dungeon.intiilize_children()
+		self.connected_to = connected_to

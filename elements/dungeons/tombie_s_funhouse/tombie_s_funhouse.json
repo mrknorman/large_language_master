@@ -1,0 +1,109 @@
+{
+    "name": "Tombie's Funhouse",
+    "description": null,
+    "parent_name": "None",
+    "lineage": "",
+    "summary": " - name: Tombie's Funhouse\n - purpose: Tombie's Funhouse is designed to challenge the party's perception of reality and test their problem-solving skills in an environment where the whimsical and the dangerous intersect.\n - flavour: The funhouse is an unpredictable labyrinth created by the eccentric wizard Tombie, who delights in the absurd. It's filled with bright colors, distorted mirrors, and bizarre contraptions that seem to defy the laws of physics.\n - secrets: Hidden mechanisms and illusions mask the true nature of the dungeon, with secret passages that can lead to Tombie's private chambers or to hidden treasures.\n - story: Long ago, Tombie was a celebrated mage, known for his extravagant parties. But as his magic delved into realms unknown, his mind became a twisted mirror of his funhouse. Now, he lures adventurers in, promising them glory and riches, if they can survive his twisted games.\n - effect: Players will experience a sense of wonder mixed with trepidation as they navigate the funhouse's deceptive appearances. The environment should encourage exploration but also instill caution, as not everything is as it seems.\n",
+    "context": " - name: Tombie's Funhouse\n - purpose: Tombie's Funhouse is designed to challenge the party's perception of reality and test their problem-solving skills in an environment where the whimsical and the dangerous intersect.\n - flavour: The funhouse is an unpredictable labyrinth created by the eccentric wizard Tombie, who delights in the absurd. It's filled with bright colors, distorted mirrors, and bizarre contraptions that seem to defy the laws of physics.\n - secrets: Hidden mechanisms and illusions mask the true nature of the dungeon, with secret passages that can lead to Tombie's private chambers or to hidden treasures.\n - story: Long ago, Tombie was a celebrated mage, known for his extravagant parties. But as his magic delved into realms unknown, his mind became a twisted mirror of his funhouse. Now, he lures adventurers in, promising them glory and riches, if they can survive his twisted games.\n - effect: Players will experience a sense of wonder mixed with trepidation as they navigate the funhouse's deceptive appearances. The environment should encourage exploration but also instill caution, as not everything is as it seems.\n",
+    "outline": {
+        "purpose": "Tombie's Funhouse is designed to challenge the party's perception of reality and test their problem-solving skills in an environment where the whimsical and the dangerous intersect.",
+        "flavour": "The funhouse is an unpredictable labyrinth created by the eccentric wizard Tombie, who delights in the absurd. It's filled with bright colors, distorted mirrors, and bizarre contraptions that seem to defy the laws of physics.",
+        "secrets": "Hidden mechanisms and illusions mask the true nature of the dungeon, with secret passages that can lead to Tombie's private chambers or to hidden treasures.",
+        "story": "Long ago, Tombie was a celebrated mage, known for his extravagant parties. But as his magic delved into realms unknown, his mind became a twisted mirror of his funhouse. Now, he lures adventurers in, promising them glory and riches, if they can survive his twisted games.",
+        "effect": "Players will experience a sense of wonder mixed with trepidation as they navigate the funhouse's deceptive appearances. The environment should encourage exploration but also instill caution, as not everything is as it seems.",
+        "rooms_outline": {
+            "The Hall of Laughter": {
+                "connected_to": [
+                    "The Mirror Maze",
+                    "The Giggling Garden"
+                ],
+                "external_connection": true,
+                "description": "This grand entrance is filled with the echoes of laughter and the sight of countless jesters' statues with varying expressions. The sound seems to emanate from the walls themselves, disorienting anyone who tries to find its source."
+            },
+            "The Mirror Maze": {
+                "connected_to": [
+                    "The Hall of Laughter",
+                    "The Room of Upside-Down"
+                ],
+                "external_connection": false,
+                "description": "In this dizzying chamber, mirrors of all shapes and sizes fragment reality. Some paths lead to dead ends, others loop back on themselves, and a few conceal the way forward."
+            },
+            "The Giggling Garden": {
+                "connected_to": [
+                    "The Hall of Laughter"
+                ],
+                "external_connection": false,
+                "description": "A bizarre indoor garden where the plants seem to have faces, and their leaves rustle with suppressed laughter. The flowers' scents have a disorienting effect, and the layout appears to change when not observed."
+            },
+            "The Room of Upside-Down": {
+                "connected_to": [
+                    "The Mirror Maze"
+                ],
+                "external_connection": false,
+                "description": "Gravity holds little sway in this confounding space, where the ceiling might as well be the floor, and walking on what seems solid ground could send adventurers tumbling into the air."
+            }
+        }
+    },
+    "verticies_outline": {
+        "Whimsical Archway": {
+            "description": "An archway made of twisting vines that giggle when touched, adorned with flowers that chuckle softly.",
+            "hit_points": "8",
+            "asymmetries": {
+                "The Giggling Garden": {
+                    "description": "From this side, the archway seems to dance lightly, its flowers beckoning travelers forth.",
+                    "visibility": "5"
+                },
+                "The Hall of Laughter": {
+                    "description": "Looking back, the archway appears more solemn, its flowers still, as if holding back a secret.",
+                    "visibility": "10"
+                }
+            },
+            "conditions": "unobstructed"
+        },
+        "Reflective Gateway": {
+            "description": "A shimmering portal framed by twisted metal, giving off a faint, otherworldly glow and distorting reflections.",
+            "hit_points": "12",
+            "asymmetries": {
+                "The Mirror Maze": {
+                    "description": "The gateway seems to grow out of the mirrors themselves, a seamless transition from the maze to the unknown.",
+                    "visibility": "15"
+                },
+                "The Room of Upside-Down": {
+                    "description": "From this vantage, the gateway hangs from the ceiling, its reflective surface a dizzying invitation to climb through.",
+                    "visibility": "20"
+                }
+            },
+            "conditions": "locked"
+        },
+        "Door of Echoes": {
+            "description": "A door that repeats the last few words spoken in its vicinity with a lagging, ghostly whisper.",
+            "hit_points": "10",
+            "asymmetries": {
+                "The Hall of Laughter": {
+                    "description": "The door's wood is warm and seems to vibrate with the residual joy of the hall.",
+                    "visibility": "10"
+                },
+                "The Mirror Maze": {
+                    "description": "Here, the door is cooler to the touch and reflects a muted version of the laughter that once passed through.",
+                    "visibility": "15"
+                }
+            },
+            "conditions": "barricaded"
+        },
+        "The Giggling Gate": {
+            "description": "The main entrance to Tombie's Funhouse is a giant clown's mouth, its paint chipped and faded, yet the hinge of its jaw creaks open as if inviting the adventurers inside.",
+            "hit_points": "20",
+            "asymmetries": {
+                "The Crooked Carnival": {
+                    "description": "From the outside, the clown's mouth appears almost welcoming, a twisted grin amidst the carnival's decay.",
+                    "visibility": "5"
+                },
+                "The Hall of Laughter": {
+                    "description": "On the inside, the gate closes with an ominous thud, the sound of laughter echoing behind it.",
+                    "visibility": "10"
+                }
+            },
+            "conditions": "unobstructed"
+        }
+    }
+}
