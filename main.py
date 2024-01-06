@@ -11,9 +11,8 @@ from player import Player
 from stats import AbilityScores, Check
 
 from audio import read
-from verbs import Enter
-
-
+from interaction import Enter, Enterable
+from prompt import ElementPromptBuilder
 
 if __name__ == "__main__":
 
@@ -54,9 +53,26 @@ if __name__ == "__main__":
         api_config=api_config
     )
 
+    # Example usage:
+    builder = ElementPromptBuilder(
+        type_name="dungeon",
+        name="Mystic Caverns",
+        focus="history and mysteries",
+        num_children=10,
+        child_name="room",
+        node_name="room",
+        story_length="few paragraphs",
+        element_examples="a hidden sanctuary, a lost kingdom, a forgotten crypt",
+        is_network=True,
+        affordances=[Enterable(parent=dungeon, is_possible=True)]
+    )
+
+    # Building the prompt
+    prompt = builder.build_prompt()
+    print(prompt)
+
+    quit()
     enter = Enter()
-
     enter(player, dungeon)
-
     player.roll(Check('strength', 'ability'))
     

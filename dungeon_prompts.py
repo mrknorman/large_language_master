@@ -4,6 +4,8 @@ f"""
 
     Remember, while building the adventure, your creativity is key, but be cautious not to reveal secrets or traps in the flavor text. These elements should remain hidden, allowing players to discover them through exploration and interaction.
 
+    Always 
+
     IMPORTANT: All responses must be structured to be compatible with Python's json.loads function for seamless conversion into a Python dictionary. This ensures your creative content can be easily incorporated into the gaming framework.
 """
 
@@ -96,7 +98,7 @@ SURROUNDINGS_PROMPT = \
     Format your response as a JSON string compatible with Python's json.loads function, with the following structure:
     {{
         "name" : "Descpiptive name of the dungeons surroundings e.g. Dense Jungle, Alien Planescape..."
-        "flavour": "First impression description. This should be the longest and set the scene as your players arrive in the area surrouding the jungle entrance.",
+        "flavour": "First impression description. This should be the longest and describe the scene to your players as they arrive in the area surrouding the jungle entrance.",
         "success_exit_text" : "This should describe how the area feels to the players after they exit the dungeon after a sucesfull mission.",
         "failed_exit_text" : "This should describe how the area feels to the players after they exit the dungeon after a failed mission.",
         "early_exit_text" : [
@@ -143,7 +145,6 @@ SURROUNDINGS_PROMPT = \
     20 - Hard to see, 25 - Very hard to see, 30 - Almost impossible to see.
     Note: Choose any value between 1 and 30 for visibility, not limited to these examples.
 """
-
 
 ROOM_PROMPT_ARGUMENTS = ["name", "lineage", "connected_verticies"]
 ROOM_PROMPT = """
@@ -192,7 +193,7 @@ PORTAL = """
         traversal-points include anything that a party member can use to transit between different 
         rooms in the dungeon. These could be doors, trapdoors, ladders, simple cracks in the wall,
         or magical portals. 
-
+        
         Here is a description of the dungeon that contains the traversak point:
 
         Name:{dungeon_name}

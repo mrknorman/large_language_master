@@ -7,6 +7,9 @@ PLAYER = ElementType(
     summary_attributes=[],
     prompt_arguments=[],
     prompt_template="",
+    prompt_focus="",
+    prompt_story_length = "", 
+    prompt_examples = "",
     child_element_dict={}
 )
 

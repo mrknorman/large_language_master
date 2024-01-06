@@ -7,7 +7,7 @@ from stats import Check
 
 from audio import read
 
-class Verb:
+class Action:
 
     def __init__(
             self,
@@ -36,16 +36,16 @@ class Affordance:
         parent : Element,
         is_possible : bool,
         name : str,
-        verb_name : str
+        action_name : str
     ):
         self.name = name
         self.parent = parent
-        self.verb_name = verb_name
+        self.action_name = action_name
         self.is_possible = is_possible
         self.success_text = None
         self.count_element = {}
 
-class Enterability(Affordance):
+class Enterable(Affordance):
 
     def __init__(
             self, 
@@ -59,10 +59,10 @@ class Enterability(Affordance):
         super().__init__(
             parent=parent,
             is_possible=is_possible,
-            name="enterability",
-            verb_name="enter", 
+            name="enterable",
+            action_name="enter", 
         )
-class Enter(Verb): 
+class Enter(Action): 
 
     def __init__(
             self,
@@ -70,7 +70,7 @@ class Enter(Verb):
         
         super().__init__(
             name="enter",
-            affordance_name="enterability",
+            affordance_name="enterable",
             check=Check(
                 attribute="dexterity", 
                 category="ability"
@@ -129,10 +129,10 @@ class Transitablity(Affordance):
             parent=parent,
             is_possible=is_possible,
             name="transitablity",
-            verb_name="transit"
+            action_name="transit"
         )
 
-class Transit(Verb):
+class Transit(Action):
     def __init__(self):
         
         super().__init__(
@@ -160,7 +160,7 @@ class Transit(Verb):
             if element.is_enterable == True:
                 read("transit")
 
-class Exitablity(Affordance):
+class Exitable(Affordance):
 
     num_of_applications = 0
     num_succesfull_applications = 0
@@ -171,10 +171,10 @@ class Exitablity(Affordance):
         super().__init__(
             parent=parent,
             is_possible=is_possible,
-            name="exitablity",
-            verb_name="exit"
+            name="exitable",
+            action_name="exit"
         )
-class Exit(Verb):
+class Exit(Action):
     def __init__(self):
         
         super().__init__(
@@ -193,7 +193,8 @@ class Exit(Verb):
             modifiers : dict = None
         ):
         pass
-class Observe(Verb):
+
+class Examine(Action):
 
     def __init__(self):
         

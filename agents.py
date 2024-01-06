@@ -1,6 +1,4 @@
 from elements import Element, ElementType, APIConfig
-from dataclasses import dataclass
-
 from stats import AbilityScores, Check
 
 class Agent(Element):

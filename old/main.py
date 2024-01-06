@@ -1,6 +1,5 @@
 # Built-In Libraries:
 import argparse
-import json
 import pickle
 from dataclasses import dataclass
 from pathlib import Path 
@@ -77,9 +76,6 @@ class floor():
 class structure():
     boundary = []
     floor = []
-
-#class Area:
-
 
 class Room:
 

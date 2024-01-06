@@ -10,13 +10,16 @@ from dungeon_prompts import (ROOM_PROMPT_ARGUMENTS, ROOM_PROMPT,
                              DUNGEON_PROMPT_ARGUMENTS, DUNGEON_PROMPT,
                              PORTAL_OUTLINE_PROMPT_ARGUMENTS, PORTAL_OUTLINE_PROMPT)
 
-from verbs import Transitablity, Enterability, Exitablity
+from interaction import Transitablity, Enterable, Exitable
 
 PORTAL = ElementType(
     name = "portal",
     summary_attributes=["name", "purpose", "flavour", "secrets", "story", "effect"],
     prompt_arguments=ROOM_PROMPT_ARGUMENTS,
     prompt_template=ROOM_PROMPT,
+    prompt_focus="aesthetics and theme",
+    prompt_story_length = "a sentence", 
+    prompt_examples = "doors, trapdoors, ladders, simple cracks in the wall, or magical portals",
     affordances=[Transitablity]
 )
 class Portal(Vertex):
@@ -42,8 +45,11 @@ ROOM = NodeElementType(
     summary_attributes=["name", "purpose", "flavour", "secrets", "story", "effect"],
     prompt_arguments=ROOM_PROMPT_ARGUMENTS,
     prompt_template=ROOM_PROMPT,
+    prompt_focus="overall story and theme",
+    prompt_story_length = "few sentences", 
+    prompt_examples = "a forgotten library, the great hall, a never-ending corridor",
     vertex_key="portals",
-    affordances=[Enterability, Exitablity]
+    affordances=[Enterable, Exitable]
 )
 class Room(Node):
 
@@ -70,9 +76,12 @@ SURROUNDINGS = CapsuleType(
     summary_attributes=["name", "purpose", "flavour", "secrets", "story", "effect"],
     prompt_arguments=SURROUNDINGS_PROMPT_ARGUMENTS,
     prompt_template=SURROUNDINGS_PROMPT,
+    prompt_focus="creating the area surrouding the dungeon",
+    prompt_story_length = "few sentences", 
+    prompt_examples = "a dense jungle, a towering abandoned cityscape, or perhaps a strange otherworldly dimension",
     vertex_key="portals",
     node_key="rooms",
-    affordances=[Enterability, Exitablity, Transitablity]
+    affordances=[Enterable, Exitable, Transitablity]
 )
 
 class Surroundings(Capsule):
@@ -95,6 +104,9 @@ DUNGEON = NetworkElementType(
         summary_attributes=["name", "purpose", "flavour", "secrets", "story", "effect"],
         prompt_arguments=DUNGEON_PROMPT_ARGUMENTS,
         prompt_template=DUNGEON_PROMPT,
+        prompt_focus="layout and overarching narrative",
+        prompt_story_length = "few paragraphs", 
+        prompt_examples = "a hidden sanctuary, a dragon's lair, a forgotten crypt",
         child_element_dict = {
             "rooms" : Room
         },
@@ -103,7 +115,7 @@ DUNGEON = NetworkElementType(
         capsule=Surroundings,
         verticies_prompt_arguments=PORTAL_OUTLINE_PROMPT_ARGUMENTS,
         verticies_prompt_template=PORTAL_OUTLINE_PROMPT,
-        affordances=[Enterability, Exitablity]
+        affordances=[Enterable, Exitable]
     )
 class Dungeon(Network):
 
@@ -126,7 +138,7 @@ class Dungeon(Network):
 
     def assemble(self):
         super().assemble()
-        self.affordances["enterability"].redirect = self.capsule
+        self.affordances["enterable"].redirect = self.capsule
 
 class ElementTypes(Enum):
     DUNGEON_PORTAL = Portal

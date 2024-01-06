@@ -1,6 +1,5 @@
 from openai import OpenAI
 from pathlib import Path 
-import subprocess
 import hashlib
 import time
 import pygame
